@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  stradegy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stradegy
+    restart: unless-stopped
+    ports:
+      - "8420:8420"
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+      - ./eval:/app/eval
+    env_file:
+      - .env
+    environment:
+      - CONFIG_DIR=/app/config
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: stradegy-tunnel
+    restart: unless-stopped
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./config/cloudflared:/etc/cloudflared
+    depends_on:
+      - stradegy
+    profiles:
+      - production

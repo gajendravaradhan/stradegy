@@ -46,3 +46,12 @@ Thumbs.db
 
 # Logs
 *.log
+# Python venv
+backend/.venv/
+*.egg-info/
+
+# Node lockfile
+frontend/package-lock.json
+
+# PWA build
+frontend/dev-dist/
