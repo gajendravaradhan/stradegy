@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     reddit_client_secret: str = ""
     reddit_user_agent: str = "stradegy/1.0"
 
+    discord_bot_token: str = ""
+    discord_channel_ids: str = ""
+    discord_guild_ids: str = ""
+    discord_user_id: str = ""
+    discord_general_channel_id: str = ""
+
     # Paths
     data_dir: Path = Path("data")
     config_dir: Path = Path("config")

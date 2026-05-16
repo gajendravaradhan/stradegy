@@ -1,6 +1,3 @@
-# Plans documentation (excluded per user request)
-plans/
-
 # Python
 __pycache__/
 *.py[cod]
@@ -45,6 +42,7 @@ Thumbs.db
 .docker/
 
 # Logs
+logs/
 *.log
 # Python venv
 backend/.venv/
@@ -55,3 +53,10 @@ frontend/package-lock.json
 
 # PWA build
 frontend/dev-dist/
+
+# AgentOps session artifacts
+.agents/
+.sisyphus/
+
+# Eval & runtime data
+eval/
