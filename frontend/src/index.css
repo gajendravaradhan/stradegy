@@ -138,6 +138,11 @@
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
   }
+
+  .app-height {
+    height: 100vh;
+    height: 100dvh;
+  }
 }
 
 @keyframes fadeInUp {

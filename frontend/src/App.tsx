@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { LayoutDashboard, Sparkles, BriefcaseBusiness, TrendingUp, Settings as SettingsIcon } from "lucide-react";
 import TabBar from "./components/TabBar";
 import Dashboard from "./pages/Dashboard";
@@ -19,7 +19,7 @@ export default function App() {
   const location = useLocation();
 
   return (
-    <div className="flex flex-col h-dvh max-w-lg mx-auto bg-background relative overflow-hidden">
+    <div className="flex flex-col max-w-lg mx-auto bg-background relative overflow-hidden app-height">
       <main className="flex-1 overflow-y-auto overflow-x-hidden">
         <Routes>
           <Route path="/" element={<Dashboard />} />
@@ -27,6 +27,7 @@ export default function App() {
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/strategies" element={<Strategies />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
       <TabBar tabs={TABS} currentPath={location.pathname} />
