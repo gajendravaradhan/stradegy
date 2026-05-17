@@ -196,7 +196,8 @@ class ResearchOrchestrator:
                     )
 
                     if gem.classification in (GemClassification.STRONG, GemClassification.POTENTIAL):
-                        validation = self.validator.validate(gem)
+                        self.validator.store = store
+                        validation = await self.validator.validate(gem)
                         if validation.is_valid:
                             gems_found.append(gem)
                             await asyncio.gather(
