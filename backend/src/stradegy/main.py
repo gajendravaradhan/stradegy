@@ -80,6 +80,7 @@ async def health_check():
 
 @app.get("/api/account/summary")
 async def account_summary():
+    from stradegy.engine.risk.tiers import get_tier_config
     return {
         "equity": 0.0,
         "buying_power": 0.0,
@@ -88,7 +89,7 @@ async def account_summary():
         "open_positions": 0,
         "mode": "paper" if settings.paper_trading else "live",
         "autonomy": settings.autonomy_mode,
-        "tier": "micro",
+        "tier": get_tier_config(0.0),
     }
 
 
@@ -287,6 +288,8 @@ async def get_portfolio():
     except Exception as e:
         logger.warning(f"Could not fetch Alpaca portfolio: {e}")
 
+    from stradegy.engine.risk.tiers import get_tier_config
+    tier = get_tier_config(equity)
     return {
         "equity": equity,
         "buying_power": buying_power,
@@ -296,6 +299,7 @@ async def get_portfolio():
         "positions": positions,
         "mode": "paper" if settings.paper_trading else "live",
         "autonomy": settings.autonomy_mode,
+        "tier": tier,
     }
 
 
@@ -350,6 +354,33 @@ async def update_settings(payload: dict):
             setattr(settings, key, value)
             changed.append(key)
     return {"success": True, "changed": changed}
+
+
+@app.get("/api/tier")
+async def get_tier(equity: float | None = None):
+    from stradegy.engine.risk.tiers import get_tier_config, TIERS
+    if equity is None:
+        try:
+            from stradegy.engine.execution.alpaca_client import AlpacaClient
+            client = AlpacaClient()
+            account = await client.get_account()
+            equity = account.get("equity", 0.0) if account else 0.0
+        except Exception:
+            equity = 0.0
+    return {
+        "current": get_tier_config(equity),
+        "all_tiers": [
+            {
+                "name": t.name,
+                "min_equity": t.min_equity,
+                "max_equity": t.max_equity,
+                "max_positions": t.max_positions,
+                "risk_per_trade": t.risk_per_trade,
+                "description": t.description,
+            }
+            for t in TIERS
+        ],
+    }
 
 
 @app.post("/api/backtest/run")
