@@ -13,10 +13,16 @@ services:
       - ./data:/app/data
       - ./config:/app/config
       - ./eval:/app/eval
-    env_file:
-      - .env
+      - ./logs:/app/logs
+      - ./backend/.env:/app/.env:ro
     environment:
-      - CONFIG_DIR=/app/config
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8420/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -24,8 +30,9 @@ services:
     restart: unless-stopped
     command: tunnel --config /etc/cloudflared/config.yml run
     volumes:
-      - ./config/cloudflared:/etc/cloudflared
+      - ./config/cloudflared:/etc/cloudflared:ro
     depends_on:
-      - stradegy
+      stradegy:
+        condition: service_healthy
     profiles:
-      - production
+      - tunnel

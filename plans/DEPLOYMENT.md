@@ -1,286 +1,188 @@
-# Deployment — Ugreen NAS + Docker + Cloudflare Tunnel
+# Deployment — Ugreen NAS + Docker
 
-## Overview
+This guide walks through deploying Stradegy to a Ugreen NAS using Docker. The NAS stays on 24/7 with minimal power draw, making it ideal for an always-on trading bot.
 
-The Stradegy backend runs as a single Docker container on your Ugreen NAS. Your phone
-connects to it via Cloudflare Tunnel (secure HTTPS, no port forwarding needed).
-The NAS runs 24/7 with minimal power consumption.
+## What You Need
+
+- Ugreen NAS with Docker support (UGOS 2.0 or newer)
+- Your NAS IP address and admin SSH credentials
+- A computer with `git` and `ssh`
+- (Optional) Cloudflare account + domain for remote HTTPS access
 
 ## Architecture
 
 ```
-Internet ──> Cloudflare ──> cloudflared ──> Docker Container (FastAPI :8420)
-               Tunnel         (on NAS)      │                 │
-               (HTTPS)                       │ Serves API + PWA │
-                                             └─────────────────┘
+Phone ──> Cloudflare Tunnel ──> NAS Docker ──> Stradegy (:8420)
+                (HTTPS)          (Local)
 ```
 
----
-
-## Prerequisites
-
-### 1. Ugreen NAS Requirements
-
-Your Ugreen NAS must support Docker. Ugreen NAS devices typically run UGOS (Linux-based)
-which supports Docker Engine.
-
-**Verify Docker is available:**
-- Open the Ugreen NAS web interface
-- Navigate to App Center → search for "Docker"
-- Install if not already present
-
-### 2. Cloudflare Account (Free)
-
-Create a free Cloudflare account at https://dash.cloudflare.com/sign-up if you
-don't already have one.
-
-### 3. Domain Name (Optional but Recommended)
-
-Cloudflare Tunnel requires a domain name managed by Cloudflare. You have several options:
-- **Buy a domain through Cloudflare** ($10-15/year — e.g., `stradegy-bot.com`)
-- **Use a free subdomain** from a service like DuckDNS or FreeDNS
-- **Use Cloudflare Tunnel with localhost only** (limits remote access — PWA won't work)
+Without Cloudflare, you access the app directly on your local network at `http://<nas-ip>:8420`.
 
 ---
 
-## Step-by-Step Setup
+## Step 1: Prepare Your NAS
 
-### Step 1: Prepare the NAS
+SSH into your NAS and create the deployment directory:
 
 ```bash
-# SSH into your Ugreen NAS
-ssh admin@<nas-ip-address>
-
-# Create the project directory
+ssh admin@<your-nas-ip>
 mkdir -p /volume1/docker/stradegy
 cd /volume1/docker/stradegy
-
-# Create persistent directories
-mkdir -p data  # For SQLite database
-mkdir -p config  # For settings files
 ```
 
-### Step 2: Copy the Project to NAS
+Create persistent data directories:
 
 ```bash
-# From your development machine
-scp -r /path/to/stradegy/* admin@<nas-ip>:/volume1/docker/stradegy/
-
-# Or use git on the NAS
-ssh admin@<nas-ip>
-cd /volume1/docker/stradegy
-# Copy over the project files
+mkdir -p data config cloudflared logs
+chmod 777 data config cloudflared logs
 ```
 
-### Step 3: Configure Environment Variables
+## Step 2: Copy the Project to Your NAS
+
+**Option A — Git clone (recommended)**
+
+On your NAS:
 
 ```bash
-# On the NAS
 cd /volume1/docker/stradegy
-cp .env.example .env
-nano .env  # Fill in your API keys
+git clone https://github.com/gajendravaradhan/stradegy.git .
 ```
 
-Required environment variables:
+**Option B — SCP from your computer**
+
+On your computer:
+
+```bash
+cd /path/to/stradegy
+cp .env.example backend/.env
+scp -r . admin@<nas-ip>:/volume1/docker/stradegy/
 ```
+
+## Step 3: Configure Environment Variables
+
+On your NAS, create the env file:
+
+```bash
+cd /volume1/docker/stradegy
+cp .env.example backend/.env
+nano backend/.env
+```
+
+Fill in at minimum:
+
+```env
 ALPACA_API_KEY=your_alpaca_key
 ALPACA_SECRET_KEY=your_alpaca_secret
-ALPACA_PAPER=true  # Start with paper trading
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token
-TELEGRAM_CHAT_ID=your_chat_id
+PAPER_TRADING=true
 FINNHUB_API_KEY=your_finnhub_key
-REDDIT_CLIENT_ID=your_reddit_client_id
-REDDIT_CLIENT_SECRET=your_reddit_secret
-REDDIT_USER_AGENT=stradegy/1.0
+
+DISCORD_BOT_TOKEN=your_discord_bot_token
+DISCORD_USER_ID=your_discord_user_id
+DISCORD_GENERAL_CHANNEL_ID=your_channel_id
 ```
 
-### Step 4: Build and Start the Container
+Save and exit (`Ctrl+O`, `Enter`, `Ctrl+X`).
+
+## Step 4: Build and Start
 
 ```bash
 cd /volume1/docker/stradegy
 
-# Build the Docker image
+# Build the image (this takes 5–15 minutes on a NAS)
 docker compose build
 
-# Start the container in detached mode
+# Start the app
 docker compose up -d
 
-# Check logs
-docker compose logs -f
+# Watch the logs
+docker compose logs -f stradegy
 ```
 
-### Step 5: Set Up Cloudflare Tunnel
+Wait for the healthcheck to pass. You should see:
+
+```
+Stradegy backend ready on 0.0.0.0:8420
+```
+
+## Step 5: Verify It Works
+
+From any device on your home network:
+
+```
+http://<your-nas-ip>:8420
+```
+
+You should see the Stradegy PWA login screen or dashboard.
+
+Test the API:
 
 ```bash
-# Install cloudflared on the NAS
-# Option A: Docker (recommended — add to docker-compose.yml)
-# Option B: Direct install
-curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared
-chmod +x /usr/local/bin/cloudflared
-
-# Authenticate
-cloudflared tunnel login
-
-# Create a tunnel
-cloudflared tunnel create stradegy
-
-# Configure the tunnel (config.yml)
-# Copy the tunnel credentials to /volume1/docker/stradegy/config/
-
-# Route traffic
-cloudflared tunnel route dns stradegy stradegy.yourdomain.com
-
-# Run the tunnel
-cloudflared tunnel run stradegy
+curl http://<your-nas-ip>:8420/api/health
+# Expected: {"status":"ok","version":"0.1.0"}
 ```
 
-### Step 6: Verify
+## Step 6: (Optional) Cloudflare Tunnel for Remote Access
 
-```bash
-# Check container is running
-docker compose ps
+If you want to access Stradegy from outside your home network:
 
-# Check logs for errors
-docker compose logs stradegy
-
-# Test API from your phone browser
-# Visit: https://stradegy.yourdomain.com/api/health
-# Should return: {"status": "ok"}
-```
-
----
-
-## Docker Compose Configuration
+1. Install `cloudflared` on your NAS (via Docker or binary)
+2. Authenticate: `cloudflared tunnel login`
+3. Create a tunnel: `cloudflared tunnel create stradegy`
+4. Copy the tunnel credentials JSON to `/volume1/docker/stradegy/config/cloudflared/`
+5. Create `/volume1/docker/stradegy/config/cloudflared/config.yml`:
 
 ```yaml
-# docker-compose.yml
-version: "3.8"
+tunnel: <your-tunnel-id>
+credentials-file: /etc/cloudflared/<tunnel-id>.json
 
-services:
-  stradegy:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: stradegy
-    restart: unless-stopped
-    ports:
-      - "8420:8420"
-    volumes:
-      - ./data:/app/data
-      - ./config:/app/config
-      - ./eval:/app/eval
-    env_file:
-      - .env
-    environment:
-      - CONFIG_DIR=/app/config
-
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: stradegy-tunnel
-    restart: unless-stopped
-    command: tunnel --config /etc/cloudflared/config.yml run
-    volumes:
-      - ./config/cloudflared:/etc/cloudflared
-    depends_on:
-      - stradegy
-    profiles:
-      - production
+ingress:
+  - hostname: stradegy.yourdomain.com
+    service: http://stradegy:8420
+  - service: http_status:404
 ```
 
-```dockerfile
-# Dockerfile (multi-stage build)
-# ---- Build Stage ----
-FROM node:22-alpine AS builder
-WORKDIR /app
-COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm ci
-COPY frontend/ .
-RUN npm run build
-
-# ---- Runtime Stage ----
-FROM python:3.12-slim
-WORKDIR /app
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY backend/pyproject.toml ./
-COPY backend/src/ ./src/
-RUN pip install --no-cache-dir .
-
-COPY --from=builder /app/dist /app/frontend/dist
-
-RUN mkdir -p /app/data /app/config /app/eval/traces
-
-EXPOSE 8420
-
-CMD ["python", "-m", "stradegy.main"]
-```
-
----
-
-## Installing the PWA on Your Phone
-
-### Android (Chrome)
-1. Open Chrome and visit `https://stradegy.yourdomain.com`
-2. Wait a few seconds for the PWA to register
-3. Tap the three-dot menu → "Add to Home Screen"
-4. Name it "Stradegy" → tap "Add"
-5. The app icon appears on your home screen
-
-### iPhone (Safari)
-1. Open Safari and visit `https://stradegy.yourdomain.com`
-2. Tap the Share button (square with arrow)
-3. Scroll down → "Add to Home Screen"
-4. Name it "Stradegy" → tap "Add"
-5. The app icon appears on your home screen
-
-### PWA Features
-- **Offline support:** Last-known data is cached. App shows stale data with "Offline" badge.
-- **Push notifications:** Gem alerts delivered even when the app is closed (requires enabling).
-- **Full-screen mode:** App opens without browser chrome (address bar hidden).
-
----
-
-## Auto-Start on NAS Boot
+6. Start the tunnel:
 
 ```bash
-# Ensure Docker starts on boot
-sudo systemctl enable docker
-
-# The docker-compose.yml has restart: unless-stopped
-# Containers will auto-start after NAS reboot
+docker compose --profile tunnel up -d cloudflared
 ```
+
+7. In Cloudflare dashboard, add a CNAME record: `stradegy` → `<tunnel-id>.cfargotunnel.com`
+
+8. Visit `https://stradegy.yourdomain.com` from your phone.
 
 ---
 
 ## Maintenance
 
-### Update the Application
+### Check Status
+
+```bash
+docker compose ps
+docker compose logs --tail=50 stradegy
+```
+
+### Update to Latest Version
+
 ```bash
 cd /volume1/docker/stradegy
-git pull
 docker compose down
+git pull
 docker compose build --no-cache
 docker compose up -d
 ```
 
-### View Logs
-```bash
-docker compose logs -f stradegy  # Real-time
-docker compose logs --tail=100 stradegy  # Last 100 lines
-```
+### Backup Your Data
 
-### Backup Database
+The SQLite database lives in `./data/`:
+
 ```bash
-# SQLite is a single file — just copy it
 cp /volume1/docker/stradegy/data/stradegy.db \
    /volume1/backup/stradegy_$(date +%Y%m%d).db
 ```
 
 ### Monitor Resource Usage
+
 ```bash
 docker stats stradegy
 ```
@@ -289,10 +191,25 @@ docker stats stradegy
 
 ## Troubleshooting
 
-| Symptom | Check |
-|---------|-------|
-| Can't reach the app | Is the container running? `docker compose ps` |
-| Cloudflare Tunnel not working | Is cloudflared running? `docker compose logs cloudflared` |
-| API errors | Check stradegy logs: `docker compose logs stradegy` |
-| Database errors | Check volume mount permissions: `ls -la data/` |
-| PWA won't install | Must be served over HTTPS. Check Cloudflare Tunnel. |
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Container exits immediately | `.env` missing or invalid keys | Check `docker compose logs stradegy` |
+| Frontend shows blank page | Static files not found | Verify `frontend/dist` exists in the built image |
+| API timeout / no data | Finnhub or Alpaca keys missing | Fill in `backend/.env` and restart |
+| Can't reach from phone | Firewall blocking port 8420 | Open port 8420 on your NAS firewall |
+| Cloudflare tunnel fails | `config.yml` path or credentials wrong | Check `docker compose logs cloudflared` |
+| Build fails on ARM NAS | Missing ARM wheels for torch | The Dockerfile uses `--platform` flags; if it still fails, build on an x86 machine and push to a registry |
+
+---
+
+## File Reference
+
+| File | Purpose |
+|------|---------|
+| `Dockerfile` | Multi-stage build: Node frontend + Python backend |
+| `docker-compose.yml` | Orchestrates app + optional Cloudflare tunnel |
+| `backend/.env` | All API keys and configuration |
+| `.env.example` | Template showing all available settings |
+| `data/` | Persistent SQLite database |
+| `config/` | Runtime config and Cloudflare tunnel credentials |
+| `logs/` | Application logs (auto-rotated) |
