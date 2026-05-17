@@ -60,6 +60,25 @@ class ResearchOrchestrator:
             tickers, hot_tickers, reddit_data=reddit_hot, discord_data=discord_hot
         )
 
+    async def run_incremental_scan(self):
+        logger.info("Running incremental scan (hot tickers only)")
+        reddit_hot, discord_hot = await asyncio.gather(
+            self._scan_reddit_and_group(),
+            self._scan_discord_and_group(),
+            return_exceptions=True,
+        )
+        if isinstance(reddit_hot, Exception):
+            reddit_hot = {}
+        if isinstance(discord_hot, Exception):
+            discord_hot = {}
+        hot_tickers = {**reddit_hot, **discord_hot}
+        if hot_tickers:
+            await self._run_full_pipeline(
+                list(hot_tickers.keys()), hot_tickers, reddit_data=reddit_hot, discord_data=discord_hot
+            )
+        else:
+            logger.info("Incremental scan: no hot tickers found")
+
     async def run_weekend_deep(self):
         logger.info("Running weekend deep analysis")
         tickers = await self._get_active_tickers()
