@@ -94,8 +94,23 @@ export function getTickers(activeOnly = true) {
   ).catch(() => []);
 }
 
+export function getTier(equity?: number) {
+  const query = equity !== undefined ? `?equity=${equity}` : "";
+  return fetchApi<{
+    current: { tier: string; max_positions: number; risk_per_trade: number; description: string };
+    all_tiers: Array<{ name: string; min_equity: number; max_equity: number | null; max_positions: number; risk_per_trade: number; description: string }>;
+  }>(`/tier${query}`).catch(() => ({
+    current: { tier: "micro", max_positions: 1, risk_per_trade: 0.03, description: "$0–$500: Micro account" },
+    all_tiers: [],
+  }));
+}
+
 export function getSparkline(symbol: string, days = 90) {
   return fetchApi<Array<{ date: string; close: number }>>(`/data/tickers/${symbol}/sparkline?days=${days}`).catch(() => []);
+}
+
+export function getPortfolioHistory(days = 90) {
+  return fetchApi<{ days: number; count: number; history: Array<{ date: string; equity: number; buying_power: number; day_pnl: number; open_positions: number; drawdown: number }> }>(`/portfolio/history?days=${days}`).catch(() => ({ days, count: 0, history: [] }));
 }
 
 interface AlertResponse {

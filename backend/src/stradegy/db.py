@@ -93,6 +93,26 @@ class MarketMetadata(Base):
     value: Mapped[str] = mapped_column(String(512), nullable=True)
 
 
+class PortfolioSnapshot(Base):
+    __tablename__ = "portfolio_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    equity: Mapped[Decimal] = mapped_column(Numeric(16, 4), nullable=False)
+    buying_power: Mapped[Decimal] = mapped_column(Numeric(16, 4), nullable=False)
+    day_pnl: Mapped[Decimal] = mapped_column(Numeric(16, 4), default=Decimal("0"))
+    open_positions: Mapped[int] = mapped_column(Integer, default=0)
+    realized_gains: Mapped[Decimal] = mapped_column(Numeric(16, 4), default=Decimal("0"))
+    tax_reserve: Mapped[Decimal] = mapped_column(Numeric(16, 4), default=Decimal("0"))
+    peak_equity: Mapped[Decimal] = mapped_column(Numeric(16, 4), nullable=True)
+    drawdown: Mapped[Decimal] = mapped_column(Numeric(8, 4), default=Decimal("0"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        UniqueConstraint("date", name="uix_snapshot_date"),
+    )
+
+
 async def get_db() -> AsyncSession:
     async with async_session() as session:
         try:

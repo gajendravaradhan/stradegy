@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { TrendingUp, TrendingDown, Activity, Wallet, ChevronDown } from "lucide-react";
+import { TrendingUp, TrendingDown, Activity, Wallet, ChevronDown, LineChart } from "lucide-react";
 import { useState } from "react";
-import { getPortfolio, getSparkline, getTickers } from "../lib/api";
+import { getPortfolio, getSparkline, getTickers, getPortfolioHistory } from "../lib/api";
 
 function SparklineChart({ data }: { data: Array<{ date: string; close: number }> }) {
   if (!data || data.length < 2) return null;
@@ -64,6 +64,13 @@ export default function Dashboard() {
     refetchInterval: 60_000,
   });
 
+  const [portfolioPeriod, setPortfolioPeriod] = useState(90);
+  const { data: portfolioHistory } = useQuery({
+    queryKey: ["portfolio_history", portfolioPeriod],
+    queryFn: () => getPortfolioHistory(portfolioPeriod),
+    refetchInterval: 300_000,
+  });
+
   if (isLoading || !data) {
     return (
       <div className="p-6 space-y-6 animate-fade-in-up">
@@ -110,6 +117,51 @@ export default function Dashboard() {
         <GlassStat label="Tax Reserve" value={`$${data.tax_reserve.toLocaleString("en-US", { minimumFractionDigits: 2 })}`} accent="amber" />
         <GlassStat label="Positions" value={String(data.open_positions)} accent={data.open_positions > 0 ? "blue" : undefined} />
       </div>
+
+      {portfolioHistory && portfolioHistory.history.length > 1 && (
+        <div className="glass rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <LineChart size={14} className="text-muted-foreground" />
+              <p className="text-[11px] text-muted-foreground tracking-[0.15em] uppercase font-medium">Portfolio Value</p>
+            </div>
+            <div className="flex gap-1">
+              {[7, 30, 90, 180].map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setPortfolioPeriod(d)}
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-colors ${
+                    portfolioPeriod === d ? "bg-primary/20 text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {d === 7 ? "1W" : d === 30 ? "1M" : d === 90 ? "3M" : "6M"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <SparklineChart data={portfolioHistory.history.map((h) => ({ date: h.date, close: h.equity }))} />
+          {portfolioHistory.history.length >= 2 && (
+            <div className="flex items-center justify-between mt-3 text-xs">
+              <span className="text-muted-foreground">
+                ${portfolioHistory.history[0].equity.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              </span>
+              {(() => {
+                const first = portfolioHistory.history[0].equity;
+                const last = portfolioHistory.history[portfolioHistory.history.length - 1].equity;
+                const pct = first > 0 ? ((last - first) / first) * 100 : 0;
+                return (
+                  <span className={`font-mono-value font-medium ${pct >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                    {pct >= 0 ? "+" : ""}{pct.toFixed(2)}%
+                  </span>
+                );
+              })()}
+              <span className="text-muted-foreground">
+                ${portfolioHistory.history[portfolioHistory.history.length - 1].equity.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="glass rounded-2xl p-5 relative">
         <div className="flex items-center justify-between mb-4">

@@ -303,6 +303,20 @@ async def get_portfolio():
     }
 
 
+@app.get("/api/portfolio/history")
+async def get_portfolio_history(days: int = 90):
+    from stradegy.engine.data.store import DataStore
+    async for session in get_db():
+        store = DataStore(session)
+        history = await store.get_portfolio_history(days=days)
+        return {
+            "days": days,
+            "count": len(history),
+            "history": history,
+        }
+    return {"days": days, "count": 0, "history": []}
+
+
 @app.get("/api/strategies")
 async def get_strategies():
     return {
@@ -475,6 +489,26 @@ async def daily_data_refresh():
                 logger.error(f"Daily refresh failed for {symbol}: {e}")
 
         logger.info(f"Daily refresh complete: {updated} tickers updated")
+
+        try:
+            from stradegy.engine.execution.alpaca_client import AlpacaClient
+            client = AlpacaClient()
+            account = await client.get_account()
+            if account:
+                from datetime import date
+                from decimal import Decimal
+                equity = Decimal(str(account.get("equity", 0)))
+                bp = Decimal(str(account.get("buying_power", 0)))
+                positions = await client.get_positions()
+                await store.save_portfolio_snapshot({
+                    "date": date.today(),
+                    "equity": equity,
+                    "buying_power": bp,
+                    "open_positions": len(positions),
+                })
+                logger.info(f"Portfolio snapshot recorded: equity={equity}")
+        except Exception as e:
+            logger.warning(f"Portfolio snapshot failed: {e}")
 
 
 async def run_self_improvement_cycle():

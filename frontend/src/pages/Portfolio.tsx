@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { TrendingUp, TrendingDown, Wallet, Receipt } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, Receipt, Layers } from "lucide-react";
 import { useState } from "react";
-import { getPortfolio } from "../lib/api";
+import { getPortfolio, getTier } from "../lib/api";
 
 export default function Portfolio() {
   const [tab, setTab] = useState<"positions" | "history">("positions");
@@ -9,6 +9,12 @@ export default function Portfolio() {
     queryKey: ["portfolio"],
     queryFn: () => getPortfolio(),
     refetchInterval: 30_000,
+  });
+  const { data: tierData } = useQuery({
+    queryKey: ["tier", data?.equity],
+    queryFn: () => getTier(data?.equity),
+    enabled: !!data,
+    staleTime: 300_000,
   });
 
   if (isLoading || !data) {
@@ -30,10 +36,23 @@ export default function Portfolio() {
       <h1 className="text-xl font-semibold mb-6">Portfolio</h1>
 
       <div className="mb-6">
-        <p className="text-[11px] text-muted-foreground tracking-[0.15em] uppercase font-medium">Total Equity</p>
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] text-muted-foreground tracking-[0.15em] uppercase font-medium">Total Equity</p>
+          {tierData && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 text-[10px] font-semibold uppercase tracking-wider">
+              <Layers size={12} />
+              {tierData.current.tier}
+            </div>
+          )}
+        </div>
         <p className="text-3xl font-semibold font-mono-value mt-1.5 tracking-tight">
           ${data.equity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
+        {tierData && (
+          <p className="text-[11px] text-muted-foreground mt-1">
+            {tierData.current.description} · Max {tierData.current.max_positions} positions · {tierData.current.risk_per_trade * 100}% risk/trade
+          </p>
+        )}
       </div>
 
       <div className="glass rounded-2xl p-1 mb-6">
