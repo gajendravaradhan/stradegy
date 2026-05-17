@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { TrendingUp, TrendingDown, Activity, Wallet } from "lucide-react";
-import { getPortfolio, getSparkline } from "../lib/api";
+import { TrendingUp, TrendingDown, Activity, Wallet, ChevronDown } from "lucide-react";
+import { useState } from "react";
+import { getPortfolio, getSparkline, getTickers } from "../lib/api";
 
 function SparklineChart({ data }: { data: Array<{ date: string; close: number }> }) {
   if (!data || data.length < 2) return null;
@@ -42,15 +43,24 @@ function SparklineChart({ data }: { data: Array<{ date: string; close: number }>
 }
 
 export default function Dashboard() {
+  const [selectedTicker, setSelectedTicker] = useState("AAPL");
+  const [showPicker, setShowPicker] = useState(false);
+
   const { data, isLoading } = useQuery({
     queryKey: ["account"],
     queryFn: () => getPortfolio(),
     refetchInterval: 30_000,
   });
 
+  const { data: tickers } = useQuery({
+    queryKey: ["tickers"],
+    queryFn: () => getTickers(true),
+    staleTime: 300_000,
+  });
+
   const { data: sparklineData } = useQuery({
-    queryKey: ["sparkline", "AAPL"],
-    queryFn: () => getSparkline("AAPL", 90),
+    queryKey: ["sparkline", selectedTicker],
+    queryFn: () => getSparkline(selectedTicker, 90),
     refetchInterval: 60_000,
   });
 
@@ -101,13 +111,32 @@ export default function Dashboard() {
         <GlassStat label="Positions" value={String(data.open_positions)} accent={data.open_positions > 0 ? "blue" : undefined} />
       </div>
 
-      <div className="glass rounded-2xl p-5">
+      <div className="glass rounded-2xl p-5 relative">
         <div className="flex items-center justify-between mb-4">
-          <p className="text-[11px] text-muted-foreground tracking-[0.15em] uppercase font-medium">AAPL Trend</p>
+          <button
+            onClick={() => setShowPicker(!showPicker)}
+            className="flex items-center gap-1 text-[11px] text-muted-foreground tracking-[0.15em] uppercase font-medium hover:text-foreground transition-colors"
+          >
+            {selectedTicker} Trend
+            <ChevronDown size={12} />
+          </button>
           <span className="text-xs font-mono-value text-muted-foreground">
             {sparklineData ? `$${sparklineData[sparklineData.length - 1]?.close.toFixed(2)}` : "—"}
           </span>
         </div>
+        {showPicker && tickers && (
+          <div className="absolute top-12 left-4 right-4 max-h-48 overflow-y-auto glass rounded-xl border border-border/40 z-10 p-2 space-y-1">
+            {tickers.map((t) => (
+              <button
+                key={t.symbol}
+                onClick={() => { setSelectedTicker(t.symbol); setShowPicker(false); }}
+                className={`w-full text-left px-3 py-2 rounded-lg text-sm ${t.symbol === selectedTicker ? "bg-primary/15 font-semibold" : "hover:bg-white/5"}`}
+              >
+                {t.symbol} <span className="text-muted-foreground text-xs">{t.name || ""}</span>
+              </button>
+            ))}
+          </div>
+        )}
         {sparklineData && sparklineData.length > 0 ? (
           <SparklineChart data={sparklineData} />
         ) : (

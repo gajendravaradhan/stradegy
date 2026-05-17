@@ -1,14 +1,16 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { LayoutDashboard, Sparkles, BriefcaseBusiness, TrendingUp, Settings as SettingsIcon } from "lucide-react";
+import { LayoutDashboard, Sparkles, BriefcaseBusiness, TrendingUp, Settings as SettingsIcon, BarChart3 } from "lucide-react";
 import TabBar from "./components/TabBar";
 import Dashboard from "./pages/Dashboard";
 import Alerts from "./pages/Alerts";
 import Portfolio from "./pages/Portfolio";
 import Strategies from "./pages/Strategies";
+import Tickers from "./pages/Tickers";
 import Settings from "./pages/Settings";
 
 const TABS = [
   { path: "/", label: "Home", icon: LayoutDashboard },
+  { path: "/tickers", label: "Tickers", icon: BarChart3 },
   { path: "/alerts", label: "Gems", icon: Sparkles },
   { path: "/portfolio", label: "Portfolio", icon: BriefcaseBusiness },
   { path: "/strategies", label: "Strategies", icon: TrendingUp },
@@ -23,6 +25,7 @@ export default function App() {
       <main className="flex-1 overflow-y-auto overflow-x-hidden">
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/tickers" element={<Tickers />} />
           <Route path="/alerts" element={<Alerts />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/strategies" element={<Strategies />} />

@@ -88,6 +88,12 @@ export function runBacktest(ticker: string, strategy: string, trainSize = 252, t
   return fetchApi<BacktestResult>(`/backtest/run?ticker=${ticker}&strategy=${strategy}&train_size=${trainSize}&test_size=${testSize}&step_size=${stepSize}`, { method: "POST" });
 }
 
+export function getTickers(activeOnly = true) {
+  return fetchApi<Array<{ symbol: string; name: string | null; sector: string | null; is_active: boolean; is_watched: boolean }>>(
+    `/data/tickers?active_only=${activeOnly}`
+  ).catch(() => []);
+}
+
 export function getSparkline(symbol: string, days = 90) {
   return fetchApi<Array<{ date: string; close: number }>>(`/data/tickers/${symbol}/sparkline?days=${days}`).catch(() => []);
 }
