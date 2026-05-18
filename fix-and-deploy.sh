@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+if ! docker info >/dev/null 2>&1; then
+    echo "Docker requires elevated permissions. Re-running with sudo..."
+    exec sudo bash "$0" "$@"
+fi
+
 echo "========================================"
 echo "Stradegy NAS Fix & Deploy Script"
 echo "========================================"
