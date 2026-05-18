@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { TrendingUp, TrendingDown, Wallet, Receipt, Layers } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, Receipt, Layers, Activity, Target, Zap, BarChart3, Award } from "lucide-react";
 import { useState } from "react";
-import { getPortfolio, getTier } from "../lib/api";
+import { getPortfolio, getTier, getPerformanceMetrics } from "../lib/api";
 
 export default function Portfolio() {
   const [tab, setTab] = useState<"positions" | "history">("positions");
@@ -54,6 +54,8 @@ export default function Portfolio() {
           </p>
         )}
       </div>
+
+      <MetricsSection />
 
       <div className="glass rounded-2xl p-1 mb-6">
         <div className="flex">
@@ -160,6 +162,101 @@ function TaxRow({ label, value, accent }: { label: string; value: string; accent
     <div className="flex items-center justify-between py-2 border-b border-border/30 last:border-0">
       <span className="text-sm text-muted-foreground">{label}</span>
       <span className={`text-sm font-mono-value font-medium ${accent === "amber" ? "text-amber-400" : ""}`}>{value}</span>
+    </div>
+  );
+}
+
+function MetricsSection() {
+  const { data: metrics, isLoading } = useQuery({
+    queryKey: ["portfolio-metrics"],
+    queryFn: () => getPerformanceMetrics(90),
+    refetchInterval: 60_000,
+    staleTime: 300_000,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="h-20 bg-muted/40 rounded-2xl animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  const m = metrics || {
+    total_trades: 0, win_rate: 0, sharpe_ratio: 0, max_drawdown: 0,
+    profit_factor: 0, avg_win: 0, avg_loss: 0, total_pnl: 0, expectancy: 0,
+  };
+
+  const hasTrades = m.total_trades > 0;
+
+  const items = [
+    {
+      label: "Sharpe Ratio",
+      value: m.sharpe_ratio.toFixed(2),
+      icon: Activity,
+      color: m.sharpe_ratio >= 1 ? "text-emerald-400" : m.sharpe_ratio >= 0.5 ? "text-amber-400" : "text-muted-foreground",
+      sub: hasTrades ? (m.sharpe_ratio >= 1 ? "Good" : m.sharpe_ratio >= 0.5 ? "Fair" : "Weak") : "No data",
+    },
+    {
+      label: "Win Rate",
+      value: `${m.win_rate.toFixed(1)}%`,
+      icon: Target,
+      color: m.win_rate >= 55 ? "text-emerald-400" : m.win_rate >= 45 ? "text-amber-400" : "text-muted-foreground",
+      sub: `${m.total_trades} trades`,
+    },
+    {
+      label: "Max Drawdown",
+      value: `${(m.max_drawdown * 100).toFixed(1)}%`,
+      icon: TrendingDown,
+      color: m.max_drawdown <= -0.1 ? "text-rose-400" : m.max_drawdown <= -0.2 ? "text-amber-400" : "text-emerald-400",
+      sub: "Peak to trough",
+    },
+    {
+      label: "Profit Factor",
+      value: m.profit_factor === Infinity ? "∞" : m.profit_factor.toFixed(2),
+      icon: Zap,
+      color: m.profit_factor >= 2 ? "text-emerald-400" : m.profit_factor >= 1.5 ? "text-amber-400" : "text-muted-foreground",
+      sub: hasTrades ? (m.profit_factor >= 2 ? "Strong" : m.profit_factor >= 1 ? "Ok" : "Weak") : "No data",
+    },
+    {
+      label: "Total P&L",
+      value: `${m.total_pnl >= 0 ? "+" : ""}$${m.total_pnl.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      icon: BarChart3,
+      color: m.total_pnl >= 0 ? "text-emerald-400" : "text-rose-400",
+      sub: "Last 90 days",
+    },
+    {
+      label: "Expectancy",
+      value: `$${m.expectancy.toFixed(2)}`,
+      icon: Award,
+      color: m.expectancy > 0 ? "text-emerald-400" : m.expectancy < 0 ? "text-rose-400" : "text-muted-foreground",
+      sub: "Avg per trade",
+    },
+  ];
+
+  return (
+    <div className="mb-6">
+      <div className="flex items-center gap-2 mb-3">
+        <Activity size={14} className="text-muted-foreground" />
+        <p className="text-[11px] text-muted-foreground tracking-[0.15em] uppercase font-medium">Performance (90d)</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {items.map((item) => {
+          const Icon = item.icon;
+          return (
+            <div key={item.label} className="glass rounded-2xl p-3.5">
+              <div className="flex items-center gap-2 mb-2">
+                <Icon size={13} className={item.color} />
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{item.label}</span>
+              </div>
+              <p className={`text-lg font-mono-value font-semibold ${item.color}`}>{item.value}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{item.sub}</p>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

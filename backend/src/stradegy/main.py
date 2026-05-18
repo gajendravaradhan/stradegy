@@ -317,6 +317,13 @@ async def get_portfolio_history(days: int = 90):
     return {"days": days, "count": 0, "history": []}
 
 
+@app.get("/api/portfolio/metrics")
+async def get_portfolio_metrics(days: int = 90):
+    from stradegy.engine.performance import get_performance_metrics
+    metrics = get_performance_metrics(days=days)
+    return metrics
+
+
 @app.get("/api/strategies")
 async def get_strategies():
     return {

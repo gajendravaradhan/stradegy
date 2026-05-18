@@ -113,6 +113,32 @@ export function getPortfolioHistory(days = 90) {
   return fetchApi<{ days: number; count: number; history: Array<{ date: string; equity: number; buying_power: number; day_pnl: number; open_positions: number; drawdown: number }> }>(`/portfolio/history?days=${days}`).catch(() => ({ days, count: 0, history: [] }));
 }
 
+export function getPerformanceMetrics(days = 90) {
+  return fetchApi<{
+    total_trades: number;
+    win_rate: number;
+    sharpe_ratio: number;
+    max_drawdown: number;
+    profit_factor: number;
+    avg_win: number;
+    avg_loss: number;
+    total_pnl: number;
+    expectancy: number;
+    period_days: number;
+  }>(`/portfolio/metrics?days=${days}`).catch(() => ({
+    total_trades: 0,
+    win_rate: 0,
+    sharpe_ratio: 0,
+    max_drawdown: 0,
+    profit_factor: 0,
+    avg_win: 0,
+    avg_loss: 0,
+    total_pnl: 0,
+    expectancy: 0,
+    period_days: days,
+  }));
+}
+
 interface AlertResponse {
   ticker: string;
   score: number;
