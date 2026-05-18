@@ -8,6 +8,8 @@ import Strategies from "./pages/Strategies";
 import Tickers from "./pages/Tickers";
 import Settings from "./pages/Settings";
 import { useWebSocket } from "./hooks/useWebSocket";
+import { usePullToRefresh } from "./hooks/usePullToRefresh";
+import { useAppBadge } from "./hooks/useAppBadge";
 
 const TABS = [
   { path: "/", label: "Home", icon: LayoutDashboard },
@@ -21,6 +23,8 @@ const TABS = [
 export default function App() {
   const location = useLocation();
   useWebSocket();
+  usePullToRefresh();
+  useAppBadge();
 
   return (
     <div className="flex flex-col max-w-lg mx-auto bg-background relative overflow-hidden app-height">

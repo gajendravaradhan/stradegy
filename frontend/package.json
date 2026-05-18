@@ -11,10 +11,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@tanstack/query-sync-storage-persister": "^5.100.10",
     "@tanstack/react-query": "^5.62.0",
+    "@tanstack/react-query-persist-client": "^5.100.10",
     "@tremor/react": "^3.18.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
+    "idb-keyval": "^6.2.2",
     "lucide-react": "^0.470.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",

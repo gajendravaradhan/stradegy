@@ -1,7 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { HashRouter } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { registerSW } from "virtual:pwa-register";
 import App from "./App";
 import "./index.css";
@@ -12,8 +14,14 @@ const queryClient = new QueryClient({
       staleTime: 30_000,
       retry: 2,
       refetchOnWindowFocus: false,
+      gcTime: 1000 * 60 * 60 * 24,
     },
   },
+});
+
+const persister = createSyncStoragePersister({
+  storage: window.localStorage,
+  key: "stradegy-query-cache",
 });
 
 const updateSW = registerSW({
@@ -29,10 +37,10 @@ const updateSW = registerSW({
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider client={queryClient} persistOptions={{ persister }}>
       <HashRouter>
         <App />
       </HashRouter>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   </React.StrictMode>,
 );
