@@ -1,0 +1,3 @@
+stradegy.duckdns.org {
+    reverse_proxy stradegy:8420
+}

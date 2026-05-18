@@ -7,8 +7,6 @@ services:
       dockerfile: Dockerfile
     container_name: stradegy
     restart: unless-stopped
-    ports:
-      - "8420:8420"
     volumes:
       - ./data:/app/data
       - ./config:/app/config
@@ -23,3 +21,15 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: stradegy-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy-data:/data
+      - ./caddy-config:/config
