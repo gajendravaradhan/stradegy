@@ -81,6 +81,31 @@ export function updateSettings(payload: Partial<SettingsResponse>) {
   });
 }
 
+export function getSecrets() {
+  return fetchApi<{
+    alpaca_api_key: string;
+    alpaca_secret_key: string;
+    finnhub_api_key: string;
+    discord_bot_token: string;
+    discord_user_id: string;
+    discord_general_channel_id: string;
+  }>("/secrets").catch(() => ({
+    alpaca_api_key: "",
+    alpaca_secret_key: "",
+    finnhub_api_key: "",
+    discord_bot_token: "",
+    discord_user_id: "",
+    discord_general_channel_id: "",
+  }));
+}
+
+export function updateSecrets(payload: Record<string, string>) {
+  return fetchApi<{ success: boolean; updated: string[] }>("/secrets", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function getBacktestStrategies() {
   return fetchApi<{ strategies: BacktestStrategy[] }>("/backtest/strategies").catch(() => ({
     strategies: [

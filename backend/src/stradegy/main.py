@@ -436,6 +436,60 @@ async def get_settings():
     }
 
 
+@app.get("/api/secrets")
+async def get_secrets():
+    def mask(value: str) -> str:
+        if not value or len(value) < 8:
+            return ""
+        return value[:4] + "•" * (len(value) - 8) + value[-4:]
+
+    return {
+        "alpaca_api_key": mask(settings.alpaca_api_key),
+        "alpaca_secret_key": mask(settings.alpaca_secret_key),
+        "finnhub_api_key": mask(settings.finnhub_api_key),
+        "discord_bot_token": mask(settings.discord_bot_token),
+        "discord_user_id": settings.discord_user_id,
+        "discord_general_channel_id": settings.discord_general_channel_id,
+    }
+
+
+@app.post("/api/secrets")
+async def update_secrets(payload: dict):
+    from pathlib import Path
+    env_path = Path(__file__).parent.parent.parent.parent / "secrets" / ".env"
+    if not env_path.exists():
+        env_path = Path(".env")
+
+    lines = []
+    if env_path.exists():
+        with open(env_path, "r") as f:
+            lines = f.readlines()
+
+    env_dict = {}
+    for line in lines:
+        line = line.strip()
+        if line and "=" in line and not line.startswith("#"):
+            key, _, val = line.partition("=")
+            env_dict[key.strip()] = val.strip()
+
+    updated = []
+    for key, value in payload.items():
+        if value and isinstance(value, str) and len(value) > 0:
+            env_dict[key] = value
+            setattr(settings, key, value)
+            updated.append(key)
+
+    with open(env_path, "w") as f:
+        for key, val in env_dict.items():
+            f.write(f"{key}={val}\n")
+
+    if env_path.exists():
+        import os
+        os.chmod(env_path, 0o600)
+
+    return {"success": True, "updated": updated}
+
+
 @app.post("/api/settings")
 async def update_settings(payload: dict):
     changed = []
