@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import { Sparkles } from "lucide-react";
-import { getAlerts } from "../lib/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Sparkles, Check, X, Loader2 } from "lucide-react";
+import { getAlerts, approveAlert, rejectAlert, type AlertResponse } from "../lib/api";
 
 function ScoreRing({ score, size = 48 }: { score: number; size?: number }) {
   const circumference = 2 * Math.PI * ((size - 4) / 2);
@@ -32,10 +32,21 @@ function ScoreRing({ score, size = 48 }: { score: number; size?: number }) {
 }
 
 export default function Alerts() {
+  const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["alerts"],
     queryFn: () => getAlerts(),
     refetchInterval: 60_000,
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: approveAlert,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["alerts"] }),
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: rejectAlert,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["alerts"] }),
   });
 
   if (isLoading) {
@@ -70,43 +81,105 @@ export default function Alerts() {
       ) : (
         <div className="space-y-4">
           {alerts.map((alert, i) => (
-            <div
+            <AlertCard
               key={`${alert.ticker}-${alert.created_at}`}
-              className="glass rounded-2xl p-5 animate-fade-in-up"
-              style={{ animationDelay: `${i * 100}ms` }}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-secondary/60 flex items-center justify-center text-sm font-bold">
-                    {alert.ticker.slice(0, 2)}
-                  </div>
-                  <div>
-                    <span className="text-base font-semibold">{alert.ticker}</span>
-                    <span
-                      className={`ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                        alert.score >= 80
-                          ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
-                          : alert.score >= 65
-                          ? "bg-amber-500/15 text-amber-400 border border-amber-500/20"
-                          : "bg-muted text-muted-foreground border border-border"
-                      }`}
-                    >
-                      {alert.classification.replace("_", " ")}
-                    </span>
-                  </div>
-                </div>
-                <ScoreRing score={Math.round(alert.score)} />
-              </div>
-
-              <div className="grid grid-cols-5 gap-2">
-                <SourcePill label="Reddit" value={alert.reddit} max={25} />
-                <SourcePill label="Discord" value={alert.discord ?? 0} max={25} />
-                <SourcePill label="SEC" value={alert.sec} max={30} />
-                <SourcePill label="News" value={alert.news} max={20} />
-                <SourcePill label="Tech" value={alert.technical} max={25} />
-              </div>
-            </div>
+              alert={alert}
+              index={i}
+              onApprove={() => approveMutation.mutate(alert.id)}
+              onReject={() => rejectMutation.mutate(alert.id)}
+              isApproving={approveMutation.isPending && approveMutation.variables === alert.id}
+              isRejecting={rejectMutation.isPending && rejectMutation.variables === alert.id}
+            />
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AlertCard({
+  alert,
+  index,
+  onApprove,
+  onReject,
+  isApproving,
+  isRejecting,
+}: {
+  alert: AlertResponse;
+  index: number;
+  onApprove: () => void;
+  onReject: () => void;
+  isApproving: boolean;
+  isRejecting: boolean;
+}) {
+  const statusConfig: Record<string, { label: string; color: string }> = {
+    pending: { label: "Pending", color: "bg-amber-500/15 text-amber-400 border-amber-500/20" },
+    approved: { label: "Approved", color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" },
+    rejected: { label: "Rejected", color: "bg-rose-500/15 text-rose-400 border-rose-500/20" },
+    executed: { label: "Executed", color: "bg-primary/15 text-primary border-primary/20" },
+  };
+  const statusStyle = statusConfig[alert.status] || statusConfig.pending;
+  const isActioned = alert.status !== "pending";
+
+  return (
+    <div
+      className="glass rounded-2xl p-5 animate-fade-in-up"
+      style={{ animationDelay: `${index * 100}ms` }}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-secondary/60 flex items-center justify-center text-sm font-bold">
+            {alert.ticker.slice(0, 2)}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-base font-semibold">{alert.ticker}</span>
+              <span
+                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider border ${
+                  alert.score >= 80
+                    ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20"
+                    : alert.score >= 65
+                    ? "bg-amber-500/15 text-amber-400 border-amber-500/20"
+                    : "bg-muted text-muted-foreground border border-border"
+                }`}
+              >
+                {alert.classification.replace("_", " ")}
+              </span>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider border ${statusStyle.color}`}>
+                {statusStyle.label}
+              </span>
+            </div>
+          </div>
+        </div>
+        <ScoreRing score={Math.round(alert.score)} />
+      </div>
+
+      <div className="grid grid-cols-5 gap-2 mb-4">
+        <SourcePill label="Reddit" value={alert.reddit} max={25} />
+        <SourcePill label="Discord" value={alert.discord ?? 0} max={25} />
+        <SourcePill label="SEC" value={alert.sec} max={30} />
+        <SourcePill label="News" value={alert.news} max={20} />
+        <SourcePill label="Tech" value={alert.technical} max={25} />
+      </div>
+
+      {!isActioned && (
+        <div className="flex gap-2">
+          <button
+            onClick={onApprove}
+            disabled={isApproving || isRejecting}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 text-xs font-semibold hover:bg-emerald-500/25 transition-colors disabled:opacity-50"
+          >
+            {isApproving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+            Approve
+          </button>
+          <button
+            onClick={onReject}
+            disabled={isApproving || isRejecting}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-rose-500/15 text-rose-400 border border-rose-500/20 text-xs font-semibold hover:bg-rose-500/25 transition-colors disabled:opacity-50"
+          >
+            {isRejecting ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+            Reject
+          </button>
         </div>
       )}
     </div>

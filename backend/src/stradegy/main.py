@@ -257,6 +257,7 @@ async def get_alerts(min_score: float = Query(default=50.0, ge=0.0, le=100.0), l
         gems = await store.get_gem_signals(min_score=min_score, limit=limit)
         return [
             {
+                "id": g.id,
                 "ticker": g.ticker_symbol,
                 "score": g.total_score,
                 "classification": g.classification,
@@ -266,10 +267,78 @@ async def get_alerts(min_score: float = Query(default=50.0, ge=0.0, le=100.0), l
                 "sec": g.sec_score,
                 "news": g.news_score,
                 "technical": g.technical_score,
+                "status": g.status,
                 "created_at": g.created_at.isoformat() if g.created_at else None,
             }
             for g in gems
         ]
+
+
+@app.post("/api/alerts/{gem_id}/approve")
+async def approve_alert(gem_id: int):
+    from stradegy.engine.research.db import ResearchStore
+    async for session in get_db():
+        store = ResearchStore(session)
+        gem = await store.approve_gem(gem_id)
+        if not gem:
+            return {"success": False, "error": "Gem not found"}
+
+        order_result = None
+        if settings.autonomy_mode == "semi":
+            try:
+                from stradegy.engine.execution.alpaca_client import AlpacaClient
+                from stradegy.engine.risk.manager import RiskManager
+                client = AlpacaClient()
+                account = await client.get_account()
+                equity = account.get("equity", 0.0) if account else 0.0
+
+                rm = RiskManager()
+                from stradegy.engine.data.store import DataStore
+                ds = DataStore(session)
+                df = await ds.get_ohlcv_dataframe(gem.ticker_symbol, limit=30)
+                atr = 0.0
+                if df is not None and len(df) >= 14:
+                    import pandas as pd
+                    hl = df["high"] - df["low"]
+                    hc = abs(df["high"] - df["close"].shift())
+                    lc = abs(df["low"] - df["close"].shift())
+                    tr = pd.concat([hl, hc, lc], axis=1).max(axis=1)
+                    atr = tr.rolling(window=14).mean().iloc[-1]
+
+                latest_price = await ds.get_latest_price(gem.ticker_symbol)
+                price = float(latest_price) if latest_price else 0.0
+
+                sizing = rm.calculate_position_size(equity, atr, price)
+                if sizing["shares"] > 0:
+                    order_result = await client.submit_order(
+                        symbol=gem.ticker_symbol,
+                        qty=sizing["shares"],
+                        side="buy",
+                        order_type="market",
+                    )
+                    if order_result and not order_result.get("error"):
+                        await store.execute_gem(gem_id)
+            except Exception as e:
+                logger.error(f"Failed to execute approved gem {gem_id}: {e}")
+                order_result = {"error": str(e)}
+
+        return {
+            "success": True,
+            "gem_id": gem_id,
+            "status": gem.status,
+            "order": order_result,
+        }
+
+
+@app.post("/api/alerts/{gem_id}/reject")
+async def reject_alert(gem_id: int):
+    from stradegy.engine.research.db import ResearchStore
+    async for session in get_db():
+        store = ResearchStore(session)
+        gem = await store.reject_gem(gem_id)
+        if not gem:
+            return {"success": False, "error": "Gem not found"}
+        return {"success": True, "gem_id": gem_id, "status": gem.status}
 
 
 @app.get("/api/portfolio")

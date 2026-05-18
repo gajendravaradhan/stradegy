@@ -108,6 +108,8 @@ class GemSignalRecord(Base):
     source_count: Mapped[int] = mapped_column(Integer, default=0)
     evidence_urls: Mapped[list[str]] = mapped_column(JSON, default=list)
     alerted: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[str] = mapped_column(String(32), default="pending")
+    actioned_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc)
     )
@@ -221,3 +223,39 @@ class ResearchStore:
         if record:
             record.alerted = True
             await self.session.commit()
+
+    async def approve_gem(self, gem_id: int) -> GemSignalRecord | None:
+        result = await self.session.execute(
+            select(GemSignalRecord).where(GemSignalRecord.id == gem_id)
+        )
+        record = result.scalar_one_or_none()
+        if record:
+            record.status = "approved"
+            record.actioned_at = datetime.now(timezone.utc)
+            await self.session.commit()
+            await self.session.refresh(record)
+        return record
+
+    async def reject_gem(self, gem_id: int) -> GemSignalRecord | None:
+        result = await self.session.execute(
+            select(GemSignalRecord).where(GemSignalRecord.id == gem_id)
+        )
+        record = result.scalar_one_or_none()
+        if record:
+            record.status = "rejected"
+            record.actioned_at = datetime.now(timezone.utc)
+            await self.session.commit()
+            await self.session.refresh(record)
+        return record
+
+    async def execute_gem(self, gem_id: int) -> GemSignalRecord | None:
+        result = await self.session.execute(
+            select(GemSignalRecord).where(GemSignalRecord.id == gem_id)
+        )
+        record = result.scalar_one_or_none()
+        if record:
+            record.status = "executed"
+            record.actioned_at = datetime.now(timezone.utc)
+            await self.session.commit()
+            await self.session.refresh(record)
+        return record

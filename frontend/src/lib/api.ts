@@ -27,6 +27,14 @@ export function getAlerts(minScore = 50, limit = 20) {
   return fetchApi<AlertResponse[]>(`/alerts?min_score=${minScore}&limit=${limit}`).catch(() => []);
 }
 
+export function approveAlert(gemId: number) {
+  return fetchApi<{ success: boolean; gem_id: number; status: string; order?: Record<string, unknown> | null }>(`/alerts/${gemId}/approve`, { method: "POST" });
+}
+
+export function rejectAlert(gemId: number) {
+  return fetchApi<{ success: boolean; gem_id: number; status: string }>(`/alerts/${gemId}/reject`, { method: "POST" });
+}
+
 export function getPortfolio() {
   return fetchApi<PortfolioResponse>("/portfolio").catch(() => ({
     equity: 0,
@@ -139,7 +147,8 @@ export function getPerformanceMetrics(days = 90) {
   }));
 }
 
-interface AlertResponse {
+export interface AlertResponse {
+  id: number;
   ticker: string;
   score: number;
   classification: string;
@@ -149,6 +158,7 @@ interface AlertResponse {
   sec: number;
   news: number;
   technical: number;
+  status: string;
   created_at: string;
 }
 
