@@ -7,6 +7,7 @@ import Portfolio from "./pages/Portfolio";
 import Strategies from "./pages/Strategies";
 import Tickers from "./pages/Tickers";
 import Settings from "./pages/Settings";
+import { useWebSocket } from "./hooks/useWebSocket";
 
 const TABS = [
   { path: "/", label: "Home", icon: LayoutDashboard },
@@ -19,6 +20,7 @@ const TABS = [
 
 export default function App() {
   const location = useLocation();
+  useWebSocket();
 
   return (
     <div className="flex flex-col max-w-lg mx-auto bg-background relative overflow-hidden app-height">
