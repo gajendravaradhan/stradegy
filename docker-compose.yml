@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: ghcr.io/gajendravaradhan/stradegy:latest
     container_name: stradegy
     restart: unless-stopped
     ports:
@@ -14,7 +15,7 @@ services:
       - ./config:/app/config
       - ./eval:/app/eval
       - ./logs:/app/logs
-      - ./backend/.env:/app/.env:ro
+      - ./secrets/.env:/app/.env:ro
     environment:
       - PYTHONUNBUFFERED=1
     healthcheck:
@@ -24,15 +25,16 @@ services:
       retries: 3
       start_period: 10s
 
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: stradegy-tunnel
+  caddy:
+    image: caddy:2-alpine
+    container_name: stradegy-caddy
     restart: unless-stopped
-    command: tunnel --config /etc/cloudflared/config.yml run
+    ports:
+      - "80:80"
+      - "443:443"
     volumes:
-      - ./config/cloudflared:/etc/cloudflared:ro
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy-data:/data
+      - ./caddy-config:/config
     depends_on:
-      stradegy:
-        condition: service_healthy
-    profiles:
-      - tunnel
+      - stradegy
