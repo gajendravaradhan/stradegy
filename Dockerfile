@@ -19,9 +19,9 @@ RUN pip install --no-cache-dir -e .
 
 COPY --from=builder /app/dist /app/frontend/dist
 
-RUN mkdir -p /app/data /app/config /app/eval/traces /app/logs
+RUN mkdir -p /app/data /app/config /app/eval/traces /logs
 RUN groupadd -r stradegy && useradd -r -g stradegy -d /app stradegy \
-    && chown -R stradegy:stradegy /app/data /app/config /app/eval /app/logs
+    && chown -R stradegy:stradegy /app/data /app/config /app/eval /logs /app
 USER stradegy
 
 EXPOSE 8420
