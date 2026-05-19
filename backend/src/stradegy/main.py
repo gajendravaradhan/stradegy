@@ -4,8 +4,9 @@ from datetime import date
 from pathlib import Path
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
@@ -948,7 +949,17 @@ async def websocket_endpoint(websocket: WebSocket):
 
 static_dir = Path(__file__).parent.parent.parent / "frontend" / "dist"
 if static_dir.exists():
-    app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
+    app.mount("/assets", StaticFiles(directory=str(static_dir / "assets")), name="assets")
+    app.mount("/icons", StaticFiles(directory=str(static_dir / "icons")), name="icons")
+
+    @app.get("/{path:path}")
+    async def serve_spa(path: str):
+        if path.startswith("api/"):
+            raise HTTPException(status_code=404)
+        file_path = static_dir / path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(str(file_path))
+        return FileResponse(str(static_dir / "index.html"))
 
 
 def main():
