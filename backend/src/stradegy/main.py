@@ -738,6 +738,7 @@ async def daily_data_refresh():
                     "drawdown": drawdown,
                 })
                 logger.info(f"Portfolio snapshot recorded: equity={equity}, peak={peak_equity}, dd={drawdown:.2%}")
+                await ws_manager.broadcast({"type": "portfolio_update"})
         except Exception as e:
             logger.warning(f"Portfolio snapshot failed: {e}")
 
@@ -751,6 +752,7 @@ async def run_self_improvement_cycle():
             store = DataStore(session)
             result = await orchestrator.run_weekly_cycle(store)
             logger.info(f"Self-improvement cycle result: {result}")
+            await ws_manager.broadcast({"type": "metrics_update"})
             break
     except Exception as e:
         logger.error(f"Self-improvement cycle failed: {e}")
@@ -896,6 +898,17 @@ async def send_quarterly_discord_report():
         logger.error(f"Quarterly Discord report failed: {e}")
 
 
+async def _research_scan_with_broadcast(scan_fn, label: str):
+    try:
+        result = await scan_fn()
+        logger.info(f"{label} complete: {result}")
+        await ws_manager.broadcast({"type": "alerts_update"})
+        return result
+    except Exception as e:
+        logger.error(f"{label} failed: {e}")
+        raise
+
+
 def schedule_jobs():
     scheduler.add_job(
         daily_data_refresh,
@@ -958,10 +971,11 @@ def schedule_jobs():
 
     try:
         from stradegy.engine.research.orchestrator import ResearchOrchestrator
+        from functools import partial
         orchestrator = ResearchOrchestrator()
 
         scheduler.add_job(
-            orchestrator.run_market_open_scan,
+            partial(_research_scan_with_broadcast, orchestrator.run_market_open_scan, "Market open scan"),
             "cron",
             day_of_week="mon-fri",
             hour=13,
@@ -971,7 +985,7 @@ def schedule_jobs():
             misfire_grace_time=300,
         )
         scheduler.add_job(
-            orchestrator.run_incremental_scan,
+            partial(_research_scan_with_broadcast, orchestrator.run_incremental_scan, "Incremental scan"),
             "cron",
             day_of_week="mon-fri",
             hour="13-20",
@@ -982,7 +996,7 @@ def schedule_jobs():
             max_instances=1,
         )
         scheduler.add_job(
-            orchestrator.run_close_scan,
+            partial(_research_scan_with_broadcast, orchestrator.run_close_scan, "Close scan"),
             "cron",
             day_of_week="mon-fri",
             hour=20,
@@ -991,7 +1005,7 @@ def schedule_jobs():
             replace_existing=True,
         )
         scheduler.add_job(
-            orchestrator.run_weekend_deep,
+            partial(_research_scan_with_broadcast, orchestrator.run_weekend_deep, "Weekend deep scan"),
             "cron",
             day_of_week="sat",
             hour=16,
