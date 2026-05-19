@@ -41,6 +41,7 @@ function MiniSparkline({ symbol }: { symbol: string }) {
 export default function Tickers() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
+  const [selectedSector, setSelectedSector] = useState<string | null>(null);
   const { data: tickers, isLoading } = useQuery({
     queryKey: ["tickers"],
     queryFn: () => getTickers(true),
@@ -49,7 +50,9 @@ export default function Tickers() {
 
   const filtered = tickers?.filter((t) => {
     const q = query.toUpperCase();
-    return t.symbol.toUpperCase().includes(q) || (t.name || "").toUpperCase().includes(q);
+    const matchesQuery = t.symbol.toUpperCase().includes(q) || (t.name || "").toUpperCase().includes(q);
+    const matchesSector = selectedSector ? t.sector === selectedSector : true;
+    return matchesQuery && matchesSector;
   });
 
   const sectors = [...new Set((tickers || []).map((t) => t.sector).filter(Boolean))];
@@ -59,30 +62,42 @@ export default function Tickers() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-semibold">Tickers</h1>
         <span className="text-xs text-muted-foreground font-mono-value">
-          {tickers?.length || 0} active
+          {filtered?.length || 0} of {tickers?.length || 0}
         </span>
       </div>
 
       <div className="relative mb-6">
-        <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
         <input
           type="text"
           placeholder="Search symbol or name..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="w-full h-11 pl-10 pr-4 rounded-xl bg-secondary/40 border border-border/30 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+          className="w-full h-11 pl-10 pr-4 rounded-xl bg-secondary/40 border border-border/30 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
         />
       </div>
 
-      {sectors.length > 0 && !query && (
+      {sectors.length > 0 && (
         <div className="flex gap-2 overflow-x-auto pb-4 mb-2 scrollbar-hide">
-          <button className="px-3 py-1.5 rounded-lg bg-primary/15 text-primary-foreground text-[11px] font-semibold whitespace-nowrap">
+          <button
+            onClick={() => setSelectedSector(null)}
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-colors ${
+              selectedSector === null
+                ? "bg-primary/15 text-primary-foreground"
+                : "bg-secondary/40 text-muted-foreground hover:text-foreground"
+            }`}
+          >
             All
           </button>
           {sectors.map((s) => (
             <button
               key={s}
-              className="px-3 py-1.5 rounded-lg bg-secondary/40 text-muted-foreground text-[11px] font-medium whitespace-nowrap hover:text-foreground transition-colors"
+              onClick={() => setSelectedSector(s === selectedSector ? null : s)}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-medium whitespace-nowrap transition-colors ${
+                selectedSector === s
+                  ? "bg-primary/15 text-primary-foreground"
+                  : "bg-secondary/40 text-muted-foreground hover:text-foreground"
+              }`}
             >
               {s}
             </button>

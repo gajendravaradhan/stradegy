@@ -1,7 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Eye, EyeOff, BarChart3 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getTickerDetail, getSparkline } from "../lib/api";
+import { getTickerDetail, getSparkline, toggleWatchTicker } from "../lib/api";
 
 function SparklineChart({ data }: { data: Array<{ date: string; close: number }> }) {
   if (!data || data.length < 2) return null;
@@ -45,6 +45,7 @@ function SparklineChart({ data }: { data: Array<{ date: string; close: number }>
 export default function TickerDetail() {
   const { symbol } = useParams<{ symbol: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data: ticker, isLoading: tickerLoading, error: tickerError } = useQuery({
     queryKey: ["ticker", symbol],
@@ -57,6 +58,14 @@ export default function TickerDetail() {
     queryFn: () => getSparkline(symbol!, 90),
     enabled: !!symbol,
     staleTime: 60_000,
+  });
+
+  const watchMutation = useMutation({
+    mutationFn: () => toggleWatchTicker(symbol!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ticker", symbol] });
+      queryClient.invalidateQueries({ queryKey: ["tickers"] });
+    },
   });
 
   if (tickerLoading) {
@@ -146,10 +155,13 @@ export default function TickerDetail() {
         </div>
 
         <button
-          className="w-full glass rounded-2xl p-4 flex items-center justify-center gap-2 text-sm font-semibold hover:bg-white/5 transition-colors"
-          onClick={() => {}}
+          className="w-full glass rounded-2xl p-4 flex items-center justify-center gap-2 text-sm font-semibold hover:bg-white/5 transition-colors disabled:opacity-50"
+          onClick={() => watchMutation.mutate()}
+          disabled={watchMutation.isPending}
         >
-          {ticker.is_watched ? (
+          {watchMutation.isPending ? (
+            <Eye size={16} className="animate-pulse" />
+          ) : ticker.is_watched ? (
             <>
               <EyeOff size={16} />
               Unwatch

@@ -229,6 +229,20 @@ async def get_data_range(symbol: str):
         }
 
 
+@app.post("/api/data/tickers/{symbol}/watch")
+async def toggle_watch_ticker(symbol: str):
+    async for session in get_db():
+        store = DataStore(session)
+        ticker = await store.get_ticker(symbol.upper())
+        if not ticker:
+            raise HTTPException(status_code=404, detail=f"Ticker {symbol} not found")
+        updated = await store.update_ticker(symbol, is_watched=not ticker.is_watched)
+        return {
+            "symbol": updated.symbol,
+            "is_watched": updated.is_watched,
+        }
+
+
 @app.get("/api/data/tickers/{symbol}/sparkline")
 async def get_sparkline(symbol: str, days: int = 90):
     async for session in get_db():

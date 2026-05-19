@@ -92,6 +92,10 @@ export function getTickerDetail(symbol: string) {
   );
 }
 
+export function toggleWatchTicker(symbol: string) {
+  return fetchApi<{ symbol: string; is_watched: boolean }>(`/data/tickers/${symbol}/watch`, { method: "POST" });
+}
+
 export function getTier(equity?: number) {
   const query = equity !== undefined ? `?equity=${equity}` : "";
   return fetchApi<{
