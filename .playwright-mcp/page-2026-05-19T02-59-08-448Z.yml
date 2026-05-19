@@ -1,0 +1,19 @@
+- generic [ref=e3]:
+  - main [ref=e4]:
+    - generic [ref=e75]:
+      - heading "Hidden Gems" [level=1] [ref=e76]
+      - generic [ref=e77]:
+        - img [ref=e79]
+        - paragraph [ref=e81]: No gems discovered yet
+        - paragraph [ref=e82]: The research pipeline scans Reddit, Discord, SEC filings, and news to find opportunities
+  - navigation [ref=e46]:
+    - button [ref=e47] [cursor=pointer]:
+      - img [ref=e49]
+    - button [active] [ref=e55] [cursor=pointer]:
+      - img [ref=e57]
+    - button [ref=e59] [cursor=pointer]:
+      - img [ref=e61]
+    - button [ref=e65] [cursor=pointer]:
+      - img [ref=e67]
+    - button [ref=e70] [cursor=pointer]:
+      - img [ref=e72]

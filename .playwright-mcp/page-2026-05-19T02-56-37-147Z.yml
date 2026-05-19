@@ -1,0 +1,63 @@
+- generic [ref=e3]:
+  - main [ref=e4]:
+    - generic [ref=e184]:
+      - heading "Settings" [level=1] [ref=e185]
+      - generic [ref=e186]:
+        - generic [ref=e187]:
+          - paragraph [ref=e188]: Trading Mode
+          - generic [ref=e190]:
+            - button "Paper Trading Practice with simulated money" [ref=e191] [cursor=pointer]:
+              - generic [ref=e195]:
+                - text: Paper Trading
+                - paragraph [ref=e196]: Practice with simulated money
+            - button "Live Trading Trade with real capital via Alpaca" [ref=e197] [cursor=pointer]:
+              - generic [ref=e200]:
+                - text: Live Trading
+                - paragraph [ref=e201]: Trade with real capital via Alpaca
+        - generic [ref=e202]:
+          - paragraph [ref=e203]: Autonomy Mode
+          - generic [ref=e205]:
+            - button "Semi-Autonomous Bot suggests trades, you approve or reject" [ref=e206] [cursor=pointer]:
+              - generic [ref=e210]:
+                - text: Semi-Autonomous
+                - paragraph [ref=e211]: Bot suggests trades, you approve or reject
+            - button "Full-Autonomous Bot trades without asking" [ref=e212] [cursor=pointer]:
+              - generic [ref=e215]:
+                - text: Full-Autonomous
+                - paragraph [ref=e216]: Bot trades without asking
+        - generic [ref=e217]:
+          - paragraph [ref=e218]: Risk Parameters
+          - generic [ref=e219]:
+            - generic [ref=e220]:
+              - generic [ref=e221]: Max Drawdown
+              - generic [ref=e222]: 20%
+            - generic [ref=e223]:
+              - generic [ref=e224]: Risk Per Trade
+              - generic [ref=e225]: 3%
+            - generic [ref=e226]:
+              - generic [ref=e227]: Max Positions
+              - generic [ref=e228]: "1"
+            - generic [ref=e229]:
+              - generic [ref=e230]: Stop ATR Multiplier
+              - generic [ref=e231]: 1.5x
+        - generic [ref=e232]:
+          - paragraph [ref=e233]: Tax Settings
+          - generic [ref=e234]:
+            - generic [ref=e235]:
+              - generic [ref=e236]: Short-Term Rate
+              - generic [ref=e237]: 30%
+            - generic [ref=e238]:
+              - generic [ref=e239]: Long-Term Rate
+              - generic [ref=e240]: 15%
+        - paragraph [ref=e242]: Stradegy v0.1.0
+  - navigation [ref=e13]:
+    - button [ref=e14] [cursor=pointer]:
+      - img [ref=e16]
+    - button [ref=e22] [cursor=pointer]:
+      - img [ref=e24]
+    - button [ref=e26] [cursor=pointer]:
+      - img [ref=e28]
+    - button [ref=e32] [cursor=pointer]:
+      - img [ref=e34]
+    - button [active] [ref=e37] [cursor=pointer]:
+      - img [ref=e39]

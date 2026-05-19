@@ -1,5 +1,5 @@
 const API_BASE = "/api";
-const API_TIMEOUT = 3000;
+const API_TIMEOUT = 10000;
 
 export async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   const controller = new AbortController();
@@ -24,7 +24,7 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
 }
 
 export function getAlerts(minScore = 50, limit = 20) {
-  return fetchApi<AlertResponse[]>(`/alerts?min_score=${minScore}&limit=${limit}`).catch(() => []);
+  return fetchApi<AlertResponse[]>(`/alerts?min_score=${minScore}&limit=${limit}`);
 }
 
 export function approveAlert(gemId: number) {
@@ -36,42 +36,15 @@ export function rejectAlert(gemId: number) {
 }
 
 export function getPortfolio() {
-  return fetchApi<PortfolioResponse>("/portfolio").catch(() => ({
-    equity: 0,
-    buying_power: 0,
-    tax_reserve: 0,
-    day_pnl: 0,
-    open_positions: 0,
-    positions: [],
-    mode: "offline",
-    autonomy: "semi",
-  }));
+  return fetchApi<PortfolioResponse>("/portfolio");
 }
 
 export function getStrategies() {
-  return fetchApi<StrategiesResponse>("/strategies").catch(() => ({
-    strategies: [
-      { name: "Mean Reversion", active: true, weight: 0.33, description: "Buy oversold, sell overbought using RSI + Bollinger Bands" },
-      { name: "Momentum Breakout", active: true, weight: 0.33, description: "Buy breakouts above 20-day high with volume + ADX confirmation" },
-      { name: "Earnings Momentum", active: true, weight: 0.34, description: "Buy MACD crossovers with volume confirmation" },
-    ],
-    ensemble_active: true,
-    min_confidence: 0.5,
-    min_agreement: 2,
-  }));
+  return fetchApi<StrategiesResponse>("/strategies");
 }
 
 export function getSettings() {
-  return fetchApi<SettingsResponse>("/settings").catch(() => ({
-    paper_trading: true,
-    autonomy_mode: "semi",
-    max_drawdown: 0.2,
-    risk_per_trade: 0.03,
-    max_positions: 1,
-    stop_atr_mult: 1.5,
-    tax_rate_short_term: 0.3,
-    tax_rate_long_term: 0.15,
-  }));
+  return fetchApi<SettingsResponse>("/settings");
 }
 
 export function updateSettings(payload: Partial<SettingsResponse>) {
@@ -89,14 +62,7 @@ export function getSecrets() {
     discord_bot_token: string;
     discord_user_id: string;
     discord_general_channel_id: string;
-  }>("/secrets").catch(() => ({
-    alpaca_api_key: "",
-    alpaca_secret_key: "",
-    finnhub_api_key: "",
-    discord_bot_token: "",
-    discord_user_id: "",
-    discord_general_channel_id: "",
-  }));
+  }>("/secrets");
 }
 
 export function updateSecrets(payload: Record<string, string>) {
@@ -107,14 +73,7 @@ export function updateSecrets(payload: Record<string, string>) {
 }
 
 export function getBacktestStrategies() {
-  return fetchApi<{ strategies: BacktestStrategy[] }>("/backtest/strategies").catch(() => ({
-    strategies: [
-      { key: "mean_reversion", name: "Mean Reversion", description: "RSI + Bollinger Bands" },
-      { key: "momentum_breakout", name: "Momentum Breakout", description: "Breakouts with ADX" },
-      { key: "earnings_momentum", name: "Earnings Momentum", description: "MACD + volume" },
-      { key: "ensemble", name: "Ensemble", description: "Consensus voting across all three" },
-    ],
-  }));
+  return fetchApi<{ strategies: BacktestStrategy[] }>("/backtest/strategies");
 }
 
 export function runBacktest(ticker: string, strategy: string, trainSize = 252, testSize = 63, stepSize = 63) {
@@ -124,7 +83,7 @@ export function runBacktest(ticker: string, strategy: string, trainSize = 252, t
 export function getTickers(activeOnly = true) {
   return fetchApi<Array<{ symbol: string; name: string | null; sector: string | null; is_active: boolean; is_watched: boolean }>>(
     `/data/tickers?active_only=${activeOnly}`
-  ).catch(() => []);
+  );
 }
 
 export function getTier(equity?: number) {
@@ -132,18 +91,15 @@ export function getTier(equity?: number) {
   return fetchApi<{
     current: { tier: string; max_positions: number; risk_per_trade: number; description: string };
     all_tiers: Array<{ name: string; min_equity: number; max_equity: number | null; max_positions: number; risk_per_trade: number; description: string }>;
-  }>(`/tier${query}`).catch(() => ({
-    current: { tier: "micro", max_positions: 1, risk_per_trade: 0.03, description: "$0–$500: Micro account" },
-    all_tiers: [],
-  }));
+  }>(`/tier${query}`);
 }
 
 export function getSparkline(symbol: string, days = 90) {
-  return fetchApi<Array<{ date: string; close: number }>>(`/data/tickers/${symbol}/sparkline?days=${days}`).catch(() => []);
+  return fetchApi<Array<{ date: string; close: number }>>(`/data/tickers/${symbol}/sparkline?days=${days}`);
 }
 
 export function getPortfolioHistory(days = 90) {
-  return fetchApi<{ days: number; count: number; history: Array<{ date: string; equity: number; buying_power: number; day_pnl: number; open_positions: number; drawdown: number }> }>(`/portfolio/history?days=${days}`).catch(() => ({ days, count: 0, history: [] }));
+  return fetchApi<{ days: number; count: number; history: Array<{ date: string; equity: number; buying_power: number; day_pnl: number; open_positions: number; drawdown: number }> }>(`/portfolio/history?days=${days}`);
 }
 
 export function getPerformanceMetrics(days = 90) {
@@ -158,18 +114,7 @@ export function getPerformanceMetrics(days = 90) {
     total_pnl: number;
     expectancy: number;
     period_days: number;
-  }>(`/portfolio/metrics?days=${days}`).catch(() => ({
-    total_trades: 0,
-    win_rate: 0,
-    sharpe_ratio: 0,
-    max_drawdown: 0,
-    profit_factor: 0,
-    avg_win: 0,
-    avg_loss: 0,
-    total_pnl: 0,
-    expectancy: 0,
-    period_days: days,
-  }));
+  }>(`/portfolio/metrics?days=${days}`);
 }
 
 export interface AlertResponse {

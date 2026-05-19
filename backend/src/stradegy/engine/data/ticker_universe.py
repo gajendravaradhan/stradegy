@@ -4,6 +4,8 @@ from pathlib import Path
 
 from loguru import logger
 
+from stradegy.engine.data.ticker_metadata import TICKER_METADATA
+
 DEFAULT_UNIVERSE = sorted(set([
     "AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA", "AVGO", "ORCL", "AMD",
     "CRM", "ADBE", "INTC", "IBM", "QCOM", "TXN", "NOW", "UBER", "SNOW", "ZM",
@@ -104,15 +106,22 @@ class TickerUniverse:
         count = 0
         for symbol in universe:
             existing = await store.get_ticker(symbol)
+            meta = TICKER_METADATA.get(symbol, {})
             if not existing:
                 await store.save_ticker(
                     symbol=symbol,
-                    name=None,
-                    sector=None,
+                    name=meta.get("name"),
+                    sector=meta.get("sector"),
                     is_active=True,
                     is_watched=symbol in self.load_watched_tickers(),
                     source="default_universe",
                 )
                 count += 1
+            elif existing and (not existing.name or not existing.sector):
+                await store.update_ticker(
+                    symbol=symbol,
+                    name=meta.get("name") or existing.name,
+                    sector=meta.get("sector") or existing.sector,
+                )
         logger.info(f"Seeded {count} new tickers to database")
         return count

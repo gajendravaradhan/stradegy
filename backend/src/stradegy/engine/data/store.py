@@ -68,6 +68,20 @@ class DataStore:
         await self.session.refresh(ticker)
         return ticker
 
+    async def update_ticker(self, symbol: str, **kwargs) -> Ticker:
+        result = await self.session.execute(
+            select(Ticker).where(Ticker.symbol == symbol.upper())
+        )
+        ticker = result.scalar_one_or_none()
+        if not ticker:
+            raise ValueError(f"Ticker {symbol} not found")
+        for key, value in kwargs.items():
+            if hasattr(ticker, key) and value is not None:
+                setattr(ticker, key, value)
+        await self.session.commit()
+        await self.session.refresh(ticker)
+        return ticker
+
     async def get_ticker(self, symbol: str) -> Ticker | None:
         result = await self.session.execute(
             select(Ticker).where(Ticker.symbol == symbol.upper())

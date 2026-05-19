@@ -1,0 +1,47 @@
+- generic [ref=e3]:
+  - main [ref=e4]:
+    - generic [ref=e367]:
+      - generic [ref=e368]:
+        - generic [ref=e369]:
+          - paragraph [ref=e370]: Portfolio Value
+          - heading "$0.00" [level=1] [ref=e371]
+          - generic [ref=e372]:
+            - img [ref=e373]
+            - generic [ref=e376]: +$0.00 (0.00%)
+        - generic [ref=e377]: Live
+      - generic [ref=e378]:
+        - generic [ref=e379]:
+          - paragraph [ref=e380]: Buying Power
+          - paragraph [ref=e381]: $0.00
+        - generic [ref=e382]:
+          - paragraph [ref=e383]: Tax Reserve
+          - paragraph [ref=e384]: $0.00
+        - generic [ref=e385]:
+          - paragraph [ref=e386]: Positions
+          - paragraph [ref=e387]: "0"
+      - generic [ref=e388]:
+        - generic [ref=e389]:
+          - paragraph [ref=e390]: AAPL Trend
+          - generic [ref=e391]: $undefined
+        - generic [ref=e392]: No chart data
+      - generic [ref=e393]:
+        - paragraph [ref=e394]: Open Positions (0)
+        - generic [ref=e395]:
+          - img [ref=e396]
+          - paragraph [ref=e399]: No open positions
+      - generic [ref=e400]:
+        - generic [ref=e401]:
+          - img [ref=e402]
+          - paragraph [ref=e404]: Recent Activity
+        - paragraph [ref=e406]: No recent activity
+  - navigation [ref=e13]:
+    - button [active] [ref=e14] [cursor=pointer]:
+      - img [ref=e16]
+    - button [ref=e22] [cursor=pointer]:
+      - img [ref=e24]
+    - button [ref=e26] [cursor=pointer]:
+      - img [ref=e28]
+    - button [ref=e32] [cursor=pointer]:
+      - img [ref=e34]
+    - button [ref=e37] [cursor=pointer]:
+      - img [ref=e39]

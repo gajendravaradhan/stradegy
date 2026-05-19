@@ -210,7 +210,7 @@ function MetricsSection() {
       label: "Max Drawdown",
       value: `${(m.max_drawdown * 100).toFixed(1)}%`,
       icon: TrendingDown,
-      color: m.max_drawdown <= -0.1 ? "text-rose-400" : m.max_drawdown <= -0.2 ? "text-amber-400" : "text-emerald-400",
+      color: m.max_drawdown <= -0.2 ? "text-rose-400" : m.max_drawdown <= -0.1 ? "text-amber-400" : "text-emerald-400",
       sub: "Peak to trough",
     },
     {

@@ -1,0 +1,39 @@
+- generic [ref=e3]:
+  - main [ref=e4]:
+    - generic [ref=e87]:
+      - heading "Portfolio" [level=1] [ref=e88]
+      - generic [ref=e89]:
+        - paragraph [ref=e90]: Total Equity
+        - paragraph [ref=e91]: $0.00
+      - generic [ref=e93]:
+        - button "Positions (0)" [ref=e94] [cursor=pointer]
+        - button "Trade History" [ref=e95] [cursor=pointer]
+      - generic [ref=e96]:
+        - img [ref=e98]
+        - paragraph [ref=e101]: No open positions
+        - paragraph [ref=e102]: Approved gems will appear here
+      - generic [ref=e103]:
+        - generic [ref=e104]:
+          - img [ref=e105]
+          - paragraph [ref=e108]: Tax Summary
+        - generic [ref=e109]:
+          - generic [ref=e110]:
+            - generic [ref=e111]: Realized Gains
+            - generic [ref=e112]: $0.00
+          - generic [ref=e113]:
+            - generic [ref=e114]: Tax Reserve (30%)
+            - generic [ref=e115]: $0.00
+          - generic [ref=e116]:
+            - generic [ref=e117]: Available
+            - generic [ref=e118]: $0.00
+  - navigation [ref=e13]:
+    - button [ref=e14] [cursor=pointer]:
+      - img [ref=e16]
+    - button [ref=e22] [cursor=pointer]:
+      - img [ref=e24]
+    - button [active] [ref=e26] [cursor=pointer]:
+      - img [ref=e28]
+    - button [ref=e32] [cursor=pointer]:
+      - img [ref=e34]
+    - button [ref=e37] [cursor=pointer]:
+      - img [ref=e39]

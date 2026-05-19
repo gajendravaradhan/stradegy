@@ -1,0 +1,65 @@
+- generic [ref=e3]:
+  - main [ref=e4]:
+    - generic [ref=e120]:
+      - heading "Strategies" [level=1] [ref=e121]
+      - generic [ref=e122]:
+        - generic [ref=e123]:
+          - generic [ref=e124]: Ensemble
+          - generic [ref=e125]: Active
+        - generic [ref=e126]:
+          - generic [ref=e127]: "Min Confidence: 0.5"
+          - generic [ref=e128]: "Min Agreement: 2"
+      - generic [ref=e129]:
+        - generic [ref=e130]:
+          - generic [ref=e131]:
+            - generic [ref=e132]: Mean Reversion
+            - button "Deactivate" [ref=e133] [cursor=pointer]:
+              - img [ref=e134]
+          - paragraph [ref=e137]: Buy oversold, sell overbought using RSI + Bollinger Bands
+          - generic [ref=e138]:
+            - generic [ref=e139]:
+              - text: "Weight:"
+              - generic [ref=e140]: 33%
+            - generic [ref=e141]: "Sharpe: —"
+            - generic [ref=e142]: "P&L: $0.00"
+          - slider [ref=e145] [cursor=pointer]: "33"
+        - generic [ref=e146]:
+          - generic [ref=e147]:
+            - generic [ref=e148]: Momentum Breakout
+            - button "Deactivate" [ref=e149] [cursor=pointer]:
+              - img [ref=e150]
+          - paragraph [ref=e153]: Buy breakouts above 20-day high with volume + ADX confirmation
+          - generic [ref=e154]:
+            - generic [ref=e155]:
+              - text: "Weight:"
+              - generic [ref=e156]: 33%
+            - generic [ref=e157]: "Sharpe: —"
+            - generic [ref=e158]: "P&L: $0.00"
+          - slider [ref=e161] [cursor=pointer]: "33"
+        - generic [ref=e162]:
+          - generic [ref=e163]:
+            - generic [ref=e164]: Earnings Momentum
+            - button "Deactivate" [ref=e165] [cursor=pointer]:
+              - img [ref=e166]
+          - paragraph [ref=e169]: Buy MACD crossovers with volume confirmation
+          - generic [ref=e170]:
+            - generic [ref=e171]:
+              - text: "Weight:"
+              - generic [ref=e172]: 34%
+            - generic [ref=e173]: "Sharpe: —"
+            - generic [ref=e174]: "P&L: $0.00"
+          - slider [ref=e177] [cursor=pointer]: "34"
+      - generic [ref=e178]:
+        - img [ref=e180]
+        - paragraph [ref=e182]: Self-improvement cycle runs weekends
+  - navigation [ref=e13]:
+    - button [ref=e14] [cursor=pointer]:
+      - img [ref=e16]
+    - button [ref=e22] [cursor=pointer]:
+      - img [ref=e24]
+    - button [ref=e26] [cursor=pointer]:
+      - img [ref=e28]
+    - button [active] [ref=e32] [cursor=pointer]:
+      - img [ref=e34]
+    - button [ref=e37] [cursor=pointer]:
+      - img [ref=e39]
