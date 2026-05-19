@@ -106,6 +106,52 @@ class AlpacaClient:
             logger.error(f"Error fetching positions: {e}")
             return []
 
+    async def get_order(self, order_id: str) -> dict[str, Any]:
+        self._ensure_client()
+        try:
+            order = self._client.get_order_by_id(order_id)
+            return {
+                "id": str(order.id),
+                "symbol": order.symbol,
+                "qty": float(order.qty) if order.qty else 0,
+                "filled_qty": float(order.filled_qty) if order.filled_qty else 0,
+                "side": order.side.value if order.side else "unknown",
+                "status": order.status.value if order.status else "unknown",
+                "created_at": order.created_at,
+                "updated_at": order.updated_at,
+            }
+        except Exception as e:
+            logger.error(f"Error fetching order {order_id}: {e}")
+            return {"error": str(e)}
+
+    async def poll_order_fill(
+        self, order_id: str, timeout: int = 30, interval: int = 2
+    ) -> dict[str, Any]:
+        import asyncio
+        import time
+
+        start = time.time()
+        while time.time() - start < timeout:
+            order = await self.get_order(order_id)
+            if order.get("error"):
+                logger.error(f"Order {order_id} error during poll: {order['error']}")
+                return {**order, "poll_timeout": False}
+
+            status = order.get("status", "").lower()
+            if status in ("filled", "partially_filled"):
+                logger.info(
+                    f"Order {order_id} {status}: filled {order.get('filled_qty', 0)}/{order.get('qty', 0)}"
+                )
+                return {**order, "poll_timeout": False}
+            if status in ("canceled", "expired", "rejected", "stopped"):
+                logger.warning(f"Order {order_id} terminal status: {status}")
+                return {**order, "poll_timeout": False}
+
+            await asyncio.sleep(interval)
+
+        logger.warning(f"Order {order_id} polling timed out after {timeout}s")
+        return {**order, "poll_timeout": True}
+
     async def close_position(self, symbol: str) -> dict[str, Any]:
         self._ensure_client()
         try:

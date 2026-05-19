@@ -372,8 +372,22 @@ async def approve_alert(gem_id: int):
                     order_type="market",
                 )
                 if order_result and not order_result.get("error"):
-                    await store.execute_gem(gem_id)
-                    logger.info(f"Order submitted for {gem.ticker_symbol}: {sizing['shares']} shares")
+                    order_id = order_result.get("id")
+                    if order_id:
+                        fill_result = await client.poll_order_fill(order_id, timeout=30, interval=2)
+                        order_result["fill_status"] = fill_result
+                        if fill_result.get("status", "").lower() == "filled":
+                            await store.execute_gem(gem_id)
+                            logger.info(
+                                f"Order filled for {gem.ticker_symbol}: {fill_result.get('filled_qty', 0)}/{fill_result.get('qty', 0)} shares"
+                            )
+                        else:
+                            logger.warning(
+                                f"Order {order_id} not filled: status={fill_result.get('status')}, timeout={fill_result.get('poll_timeout')}"
+                            )
+                    else:
+                        await store.execute_gem(gem_id)
+                        logger.info(f"Order submitted for {gem.ticker_symbol} (no order ID to poll)")
             except Exception as e:
                 logger.error(f"Failed to execute approved gem {gem_id}: {e}")
                 order_result = {"error": str(e)}
