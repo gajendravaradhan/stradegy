@@ -1,11 +1,13 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { LayoutDashboard, Sparkles, BriefcaseBusiness, TrendingUp, Settings as SettingsIcon, BarChart3 } from "lucide-react";
 import TabBar from "./components/TabBar";
+import ErrorBoundary from "./components/ErrorBoundary";
 import Dashboard from "./pages/Dashboard";
 import Alerts from "./pages/Alerts";
 import Portfolio from "./pages/Portfolio";
 import Strategies from "./pages/Strategies";
 import Tickers from "./pages/Tickers";
+import TickerDetail from "./pages/TickerDetail";
 import Settings from "./pages/Settings";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { usePullToRefresh } from "./hooks/usePullToRefresh";
@@ -29,15 +31,18 @@ export default function App() {
   return (
     <div className="flex flex-col max-w-lg mx-auto bg-background relative overflow-hidden app-height">
       <main className="flex-1 overflow-y-auto overflow-x-hidden">
-        <Routes>
+        <ErrorBoundary>
+          <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/tickers" element={<Tickers />} />
+          <Route path="/tickers/:symbol" element={<TickerDetail />} />
           <Route path="/alerts" element={<Alerts />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/strategies" element={<Strategies />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </ErrorBoundary>
       </main>
       <TabBar tabs={TABS} currentPath={location.pathname} />
     </div>

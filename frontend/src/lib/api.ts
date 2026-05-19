@@ -86,6 +86,12 @@ export function getTickers(activeOnly = true) {
   );
 }
 
+export function getTickerDetail(symbol: string) {
+  return fetchApi<{ symbol: string; name: string | null; sector: string | null; is_active: boolean; is_watched: boolean }>(
+    `/data/tickers/${symbol}`
+  );
+}
+
 export function getTier(equity?: number) {
   const query = equity !== undefined ? `?equity=${equity}` : "";
   return fetchApi<{

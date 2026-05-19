@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { Search, BarChart3, Eye, EyeOff } from "lucide-react";
+import { Search, BarChart3, Eye, EyeOff, ChevronRight } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getTickers, getSparkline } from "../lib/api";
 
 function MiniSparkline({ symbol }: { symbol: string }) {
@@ -38,6 +39,7 @@ function MiniSparkline({ symbol }: { symbol: string }) {
 }
 
 export default function Tickers() {
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const { data: tickers, isLoading } = useQuery({
     queryKey: ["tickers"],
@@ -97,9 +99,10 @@ export default function Tickers() {
       ) : filtered && filtered.length > 0 ? (
         <div className="space-y-2.5">
           {filtered.map((ticker) => (
-            <div
+            <button
               key={ticker.symbol}
-              className="glass rounded-2xl p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+              onClick={() => navigate(`/tickers/${ticker.symbol}`)}
+              className="w-full glass rounded-2xl p-4 flex items-center justify-between hover:bg-white/5 transition-colors text-left"
             >
               <div className="flex items-center gap-3.5">
                 <div className="w-10 h-10 rounded-xl bg-secondary/60 flex items-center justify-center text-sm font-bold">
@@ -116,9 +119,10 @@ export default function Tickers() {
                 <MiniSparkline symbol={ticker.symbol} />
                 <div className="flex items-center gap-1 text-muted-foreground">
                   {ticker.is_watched ? <Eye size={14} className="text-amber-400" /> : <EyeOff size={14} />}
+                  <ChevronRight size={14} />
                 </div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       ) : (

@@ -200,6 +200,22 @@ async def seed_tickers():
         return {"success": True, "tickers_seeded": count}
 
 
+@app.get("/api/data/tickers/{symbol}")
+async def get_ticker_detail(symbol: str):
+    async for session in get_db():
+        store = DataStore(session)
+        ticker = await store.get_ticker(symbol.upper())
+        if not ticker:
+            raise HTTPException(status_code=404, detail=f"Ticker {symbol} not found")
+        return {
+            "symbol": ticker.symbol,
+            "name": ticker.name,
+            "sector": ticker.sector,
+            "is_active": ticker.is_active,
+            "is_watched": ticker.is_watched,
+        }
+
+
 @app.get("/api/data/tickers/{symbol}/range")
 async def get_data_range(symbol: str):
     async for session in get_db():
