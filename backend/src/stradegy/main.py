@@ -1066,6 +1066,28 @@ if static_dir.exists():
     app.mount("/assets", StaticFiles(directory=str(static_dir / "assets")), name="assets")
     app.mount("/icons", StaticFiles(directory=str(static_dir / "icons")), name="icons")
 
+    @app.get("/manifest.webmanifest")
+    async def serve_manifest():
+        return FileResponse(
+            str(static_dir / "manifest.webmanifest"),
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
+
+    @app.get("/sw.js")
+    async def serve_sw():
+        return FileResponse(
+            str(static_dir / "sw.js"),
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
+
     @app.get("/{path:path}")
     async def serve_spa(path: str):
         if path.startswith("api/"):
@@ -1073,7 +1095,14 @@ if static_dir.exists():
         file_path = static_dir / path
         if file_path.exists() and file_path.is_file():
             return FileResponse(str(file_path))
-        return FileResponse(str(static_dir / "index.html"))
+        return FileResponse(
+            str(static_dir / "index.html"),
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
 
 
 def main():

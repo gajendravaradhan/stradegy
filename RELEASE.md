@@ -80,6 +80,7 @@ API keys (Alpaca, Finnhub, Discord) can be configured directly through the Setti
 - **"undefined" Price**: Fixed sparkline price display when data is undefined
 - **Stale Build**: Frontend base path fixed from `/stradegy/` to `/` for VM root deployment
 - **Loading States**: Proper loading indicators on all data-dependent components
+- **White Screen After Deploy**: Added no-cache headers to `index.html`, `manifest.webmanifest`, and `sw.js` so browsers always fetch the current version after deployments. Previously, cached HTML referenced stale hashed asset filenames that no longer existed, causing React to fail silently and show a blank white page.
 
 ---
 
