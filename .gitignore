@@ -23,7 +23,7 @@ frontend/dist/
 config/secrets.yaml
 
 # Database
-data/
+/data/
 *.db
 *.sqlite
 

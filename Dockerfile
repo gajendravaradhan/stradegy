@@ -1,10 +1,3 @@
-FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
-WORKDIR /app
-COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm ci
-COPY frontend/ .
-RUN npm run build
-
 FROM python:3.12-slim
 WORKDIR /app
 
@@ -17,7 +10,7 @@ COPY backend/pyproject.toml ./
 COPY backend/src/ ./src/
 RUN pip install --no-cache-dir -e .
 
-COPY --from=builder /app/dist /app/frontend/dist
+COPY frontend/dist /app/frontend/dist
 
 RUN mkdir -p /app/data /app/config /app/eval/traces /logs
 RUN groupadd -r stradegy && useradd -r -g stradegy -d /app stradegy \
