@@ -172,3 +172,9 @@ class DataStore:
         df = pd.DataFrame(data, index=[r.date for r in records])
         df.index = pd.to_datetime(df.index)
         return df
+
+    async def get_latest_price(self, symbol: str) -> float | None:
+        records = await self.get_ticker_data(symbol, limit=1)
+        if not records:
+            return None
+        return float(records[0].close)

@@ -289,13 +289,61 @@ async def approve_alert(gem_id: int):
             try:
                 from stradegy.engine.execution.alpaca_client import AlpacaClient
                 from stradegy.engine.risk.manager import RiskManager
+                from stradegy.engine.data.store import DataStore
+
                 client = AlpacaClient()
                 account = await client.get_account()
-                equity = account.get("equity", 0.0) if account else 0.0
+                if not account:
+                    return {"success": False, "error": "Could not fetch Alpaca account"}
 
-                rm = RiskManager()
-                from stradegy.engine.data.store import DataStore
+                equity = account.get("equity", 0.0)
                 ds = DataStore(session)
+                rm = RiskManager()
+
+                history = await ds.get_portfolio_history(days=90)
+                peak_equity = equity
+                for h in history:
+                    if h.get("peak_equity") and h["peak_equity"] > peak_equity:
+                        peak_equity = h["peak_equity"]
+                    elif h.get("equity") and h["equity"] > peak_equity:
+                        peak_equity = h["equity"]
+
+                pdt_data = rm.check_pdt([])
+                emergency = rm.emergency_check(equity, peak_equity, pdt_data, [])
+                if emergency["should_halt_trading"]:
+                    logger.warning(f"TRADING HALTED: {emergency['emergencies']}")
+                    return {
+                        "success": False,
+                        "error": f"Trading halted: {'; '.join(emergency['emergencies'])}",
+                        "gem_id": gem_id,
+                    }
+
+                from datetime import datetime
+                import pytz
+                et = pytz.timezone("US/Eastern")
+                now = datetime.now(et)
+                market_closed = (
+                    now.weekday() >= 5
+                    or now.hour < 9
+                    or (now.hour == 9 and now.minute < 30)
+                    or now.hour >= 16
+                )
+                if market_closed:
+                    return {
+                        "success": False,
+                        "error": "Market is closed. Orders allowed only during market hours (Mon-Fri 9:30-16:00 ET).",
+                        "gem_id": gem_id,
+                    }
+
+                positions = await client.get_positions()
+                tier = rm._tier_config(equity)
+                if len(positions) >= tier["max_positions"]:
+                    return {
+                        "success": False,
+                        "error": f"Max positions reached ({len(positions)}/{tier['max_positions']}) for tier {tier['tier']}.",
+                        "gem_id": gem_id,
+                    }
+
                 df = await ds.get_ohlcv_dataframe(gem.ticker_symbol, limit=30)
                 atr = 0.0
                 if df is not None and len(df) >= 14:
@@ -310,15 +358,22 @@ async def approve_alert(gem_id: int):
                 price = float(latest_price) if latest_price else 0.0
 
                 sizing = rm.calculate_position_size(equity, atr, price)
-                if sizing["shares"] > 0:
-                    order_result = await client.submit_order(
-                        symbol=gem.ticker_symbol,
-                        qty=sizing["shares"],
-                        side="buy",
-                        order_type="market",
-                    )
-                    if order_result and not order_result.get("error"):
-                        await store.execute_gem(gem_id)
+                if sizing["shares"] <= 0:
+                    return {
+                        "success": False,
+                        "error": f"Position sizing returned 0 shares (price={price}, atr={atr}).",
+                        "gem_id": gem_id,
+                    }
+
+                order_result = await client.submit_order(
+                    symbol=gem.ticker_symbol,
+                    qty=sizing["shares"],
+                    side="buy",
+                    order_type="market",
+                )
+                if order_result and not order_result.get("error"):
+                    await store.execute_gem(gem_id)
+                    logger.info(f"Order submitted for {gem.ticker_symbol}: {sizing['shares']} shares")
             except Exception as e:
                 logger.error(f"Failed to execute approved gem {gem_id}: {e}")
                 order_result = {"error": str(e)}
@@ -631,13 +686,28 @@ async def daily_data_refresh():
                 equity = Decimal(str(account.get("equity", 0)))
                 bp = Decimal(str(account.get("buying_power", 0)))
                 positions = await client.get_positions()
+
+                history = await store.get_portfolio_history(days=90)
+                peak_equity = equity
+                for h in history:
+                    if h.get("peak_equity") and h["peak_equity"] > peak_equity:
+                        peak_equity = Decimal(str(h["peak_equity"]))
+                    elif h.get("equity") and h["equity"] > peak_equity:
+                        peak_equity = Decimal(str(h["equity"]))
+
+                drawdown = 0.0
+                if peak_equity > 0:
+                    drawdown = float((peak_equity - equity) / peak_equity)
+
                 await store.save_portfolio_snapshot({
                     "date": date.today(),
                     "equity": equity,
                     "buying_power": bp,
                     "open_positions": len(positions),
+                    "peak_equity": peak_equity,
+                    "drawdown": drawdown,
                 })
-                logger.info(f"Portfolio snapshot recorded: equity={equity}")
+                logger.info(f"Portfolio snapshot recorded: equity={equity}, peak={peak_equity}, dd={drawdown:.2%}")
         except Exception as e:
             logger.warning(f"Portfolio snapshot failed: {e}")
 
