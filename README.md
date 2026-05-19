@@ -4,21 +4,21 @@ An autonomous, self-improving algorithmic trading system that runs on your own h
 
 **Philosophy:** *Research signals → Ensemble strategy voting → Risk-managed execution → Continuous self-improvement*
 
-📱 **Live App:** https://gajendravaradhan.github.io/stradegy  
+📱 **Live App:** https://stradegy.duckdns.org  
 📖 **User Journey & Full Documentation:** [USER_JOURNEY.md](./USER_JOURNEY.md)
 
 ---
 
 ## What It Does
 
-Stradegy is a complete autonomous trading stack designed for a single user. It monitors 53 US equities 24/7, generates trade signals from multiple research sources, votes on them through three distinct algorithmic strategies, and executes trades via Alpaca — all while managing risk and improving itself weekly.
+Stradegy is a complete autonomous trading stack designed for a single user. It monitors 209 US equities 24/7, generates trade signals from multiple research sources, votes on them through three distinct algorithmic strategies, and executes trades via Alpaca — all while managing risk and improving itself weekly.
 
 ### Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                        FRONTEND (PWA)                       │
-│  Dashboard → Alerts → Portfolio → Strategies → Settings     │
+│  Dashboard → Tickers → Alerts → Portfolio → Settings        │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -53,6 +53,12 @@ Scans four independent signal sources and aggregates them into "Gem Signals":
 
 Each gem gets a **0–100 score**, classification (Strong / Potential / Watchlist), and per-source breakdown.
 
+### 209-Ticker Universe with Real-Time Data
+- Full OHLCV backfill for 209 US equities (20+ years of historical data, ~1M rows)
+- Real-time sparkline charts on the Tickers page
+- Detailed ticker views with 90-day price history
+- Incremental daily updates at 20:00 UTC
+
 ### Tiered Discord Alert System
 Urgent gems (score ≥85, 3+ sources) → **DM you directly**. Regular gems, trades, and reports → **#general channel**. Risk alerts → **DM only**.
 
@@ -83,12 +89,20 @@ Every Sunday at 02:00 UTC, the bot:
 ### Walk-Forward Backtesting
 Uses rolling windows (train 1 year → test 3 months → roll forward) to validate strategies without peeking at future data.
 
+### Premium PWA Experience
+- Mobile-first design with bottom navigation
+- Pull-to-refresh gesture support
+- App badge for unread alerts
+- Offline persistence via TanStack Query cache
+- Real-time WebSocket push updates
+- Error boundary with graceful fallback UI
+
 ---
 
 ## Quick Start
 
 ### Prerequisites
-- Python 3.11+
+- Python 3.12+
 - Node.js 20+
 - A free Alpaca paper account ([alpaca.markets](https://alpaca.markets))
 - A free Finnhub API key ([finnhub.io](https://finnhub.io))
@@ -101,9 +115,11 @@ git clone git@github.com:gajendravaradhan/stradegy.git
 cd stradegy
 
 # Backend
-python -m venv backend/.venv
+python3.12 -m venv backend/.venv
 source backend/.venv/bin/activate  # or .\backend\.venv\Scripts\activate on Windows
-pip install -r backend/requirements.txt
+cd backend
+pip install -e .
+cd ..
 
 # Frontend
 cd frontend
@@ -131,7 +147,7 @@ PAPER_TRADING=true
 AUTONOMY_MODE=semi
 ```
 
-### Run
+### Run Locally
 
 ```bash
 ./start.sh
@@ -139,9 +155,20 @@ AUTONOMY_MODE=semi
 
 This starts:
 - **Backend** at `http://localhost:8420`
-- **Frontend** at `http://localhost:5173`
+- **Frontend dev server** at `http://localhost:5173`
 
-The backend auto-seeds 53 tickers into a local SQLite database on first startup.
+The backend auto-seeds 209 tickers into a local SQLite database on first startup.
+
+### Production Deployment
+
+The current deployment uses a Ubuntu VM with native Python execution:
+
+1. **VM Setup**: Python 3.12 venv, Caddy reverse proxy with Let's Encrypt
+2. **Auto-start**: systemd service for boot resilience
+3. **HTTPS**: Automatic certificate renewal via Caddy
+4. **Database**: SQLite with ~1M OHLCV rows for 209 tickers
+
+For detailed deployment instructions, see `plans/DEPLOYMENT.md`.
 
 ---
 
@@ -151,11 +178,20 @@ The backend auto-seeds 53 tickers into a local SQLite database on first startup.
 |--------|----------|---------|
 | `GET` | `/api/health` | System status |
 | `GET` | `/api/portfolio` | Real-time Alpaca positions & equity |
+| `GET` | `/api/portfolio/metrics` | Portfolio performance metrics |
 | `GET` | `/api/alerts` | Hidden gems list |
+| `POST` | `/api/alerts/{id}/approve` | Approve and execute a gem alert |
+| `POST` | `/api/alerts/{id}/reject` | Reject a gem alert |
+| `GET` | `/api/data/tickers` | Full ticker universe with metadata |
+| `GET` | `/api/data/tickers/{symbol}` | Ticker detail with 90-day sparkline |
 | `GET` | `/api/strategies` | Strategy config & weights |
+| `GET` | `/api/settings` | Current settings |
+| `POST` | `/api/settings` | Update settings |
+| `GET` | `/api/secrets` | Masked secrets configuration |
 | `POST` | `/api/backtest/run` | Walk-forward backtest |
 | `POST` | `/api/data/backfill` | Backfill historical OHLCV |
 | `POST` | `/api/data/incremental` | Incremental data update |
+| `WS` | `/api/ws` | Real-time WebSocket updates |
 
 See [USER_JOURNEY.md](./USER_JOURNEY.md) for the complete API reference.
 
@@ -179,13 +215,14 @@ See [USER_JOURNEY.md](./USER_JOURNEY.md) for the complete API reference.
 
 | Layer | Technology |
 |-------|-----------|
-| **Backend** | Python 3.11, FastAPI, SQLAlchemy (async), SQLite |
+| **Backend** | Python 3.12, FastAPI, SQLAlchemy (async), SQLite |
 | **Frontend** | React 18, TypeScript, Vite, Tailwind CSS |
 | **Data** | Finnhub, Alpaca Markets, SEC EDGAR |
 | **Research** | Reddit (public JSON), VADER sentiment, FinBERT, TA-Lib indicators |
 | **Execution** | Alpaca REST API |
 | **Alerts** | Discord (DM for urgent, channel for routine) |
 | **Scheduling** | APScheduler |
+| **Reverse Proxy** | Caddy 2 with automatic HTTPS |
 | **Testing** | pytest, pytest-asyncio (192 tests) |
 
 ---
@@ -199,6 +236,7 @@ See [USER_JOURNEY.md](./USER_JOURNEY.md) for the complete API reference.
 | **PDT guard** | Blocks 4th day trade for sub-$25k accounts |
 | **Key distinction** | Alpaca live keys start with `AK`; paper keys start with `PK` |
 | **No secrets in git** | `.env` and all credential files are in `.gitignore` |
+| **Secrets vault** | Settings page writes to `.env` with `chmod 600` |
 
 ---
 
@@ -210,7 +248,6 @@ Before switching to live trading, complete the checklist in `plans/LIVE_TRADING_
 - Backtest Sharpe ratio > 0.5 and max drawdown < 20%
 - Self-improvement cycle has run at least once
 - All 192 unit/integration tests passing
-- Docker image builds successfully
 - PWA installs on your phone via HTTPS
 - Alpaca live account funded with $200 minimum
 - `PAPER_TRADING=false` set in `.env`
@@ -226,6 +263,9 @@ Before switching to live trading, complete the checklist in `plans/LIVE_TRADING_
 ## Documentation
 
 - **[USER_JOURNEY.md](./USER_JOURNEY.md)** — Complete walkthrough of every screen, every backend job, and every safety guardrail
+- **[plans/ARCHITECTURE.md](./plans/ARCHITECTURE.md)** — System design and tech stack decisions
+- **[plans/ROADMAP.md](./plans/ROADMAP.md)** — Build phases and feature timeline
+- **[plans/DEPLOYMENT.md](./plans/DEPLOYMENT.md)** — VM deployment with Caddy and systemd
 - **[plans/LIVE_TRADING_CHECKLIST.md](./plans/LIVE_TRADING_CHECKLIST.md)** — Pre-live trading safety checklist
 - **[API docs](http://localhost:8420/docs)** — Auto-generated FastAPI OpenAPI docs (when running locally)
 
@@ -248,4 +288,4 @@ MIT — Use at your own risk. This is not financial advice. Past performance doe
 
 ---
 
-*Stradegy v1.0.0 — Built for autonomous, self-improving, risk-managed algorithmic trading.*
+*Stradegy v2.0.0 — Built for autonomous, self-improving, risk-managed algorithmic trading.*

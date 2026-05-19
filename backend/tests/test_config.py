@@ -6,7 +6,7 @@ from stradegy.config import Settings
 def test_settings_defaults():
     settings = Settings()
     assert settings.app_name == "Stradegy"
-    assert settings.app_version == "0.1.0"
+    assert settings.app_version == "2.0.0"
     assert settings.host == "0.0.0.0"
     assert settings.port == 8420
     assert settings.paper_trading is True

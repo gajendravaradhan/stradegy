@@ -291,4 +291,4 @@ Move to the next phase only after the current phase shows 2+ months of profitabl
 
 ---
 
-*Stradegy v0.1.0 — Built for autonomous, self-improving, risk-managed algorithmic trading.*
+*Stradegy v2.0.0 — Built for autonomous, self-improving, risk-managed algorithmic trading.*

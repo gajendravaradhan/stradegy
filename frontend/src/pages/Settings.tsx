@@ -113,7 +113,7 @@ export default function Settings() {
         <VaultSecretsSection />
 
         <div className="text-center py-4">
-          <p className="text-xs text-muted-foreground">Stradegy v0.1.0</p>
+          <p className="text-xs text-muted-foreground">Stradegy v2.0.0</p>
         </div>
       </div>
     </div>

@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "Stradegy"
-    app_version: str = "0.1.0"
+    app_version: str = "2.0.0"
 
     # Server
     host: str = "0.0.0.0"

@@ -118,7 +118,7 @@ Test the API:
 
 ```bash
 curl http://<your-nas-ip>:8420/api/health
-# Expected: {"status":"ok","version":"0.1.0"}
+# Expected: {"status":"ok","version":"2.0.0"}
 ```
 
 ## Step 6: (Optional) Cloudflare Tunnel for Remote Access
