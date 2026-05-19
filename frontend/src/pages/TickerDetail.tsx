@@ -1,46 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Eye, EyeOff, BarChart3 } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, BarChart3, Info } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getTickerDetail, getSparkline, toggleWatchTicker } from "../lib/api";
-
-function SparklineChart({ data }: { data: Array<{ date: string; close: number }> }) {
-  if (!data || data.length < 2) return null;
-
-  const prices = data.map((d) => d.close);
-  const min = Math.min(...prices);
-  const max = Math.max(...prices);
-  const range = max - min || 1;
-  const width = 300;
-  const height = 120;
-
-  const points = prices.map((price, i) => {
-    const x = (i / (prices.length - 1)) * width;
-    const y = height - ((price - min) / range) * (height - 20) - 10;
-    return `${x},${y}`;
-  });
-
-  const isProfit = prices[prices.length - 1] >= prices[0];
-  const strokeColor = isProfit ? "hsl(142 76% 45%)" : "hsl(0 72% 51%)";
-
-  const areaPath = points
-    .map((p, i) => `${i === 0 ? "M" : "L"} ${p}`)
-    .join(" ")
-    .concat(` L ${width},${height} L 0,${height} Z`);
-
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-32" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="detailAreaGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.3" />
-          <stop offset="100%" stopColor={strokeColor} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={areaPath} fill="url(#detailAreaGrad)" />
-      <polyline fill="none" stroke={strokeColor} strokeWidth="2" points={points.join(" ")} strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={points[points.length - 1].split(",")[0]} cy={points[points.length - 1].split(",")[1]} r="4" fill={strokeColor} stroke="white" strokeWidth="2" />
-    </svg>
-  );
-}
+import InteractiveSparkline from "../components/InteractiveSparkline";
 
 export default function TickerDetail() {
   const { symbol } = useParams<{ symbol: string }>();
@@ -135,7 +97,7 @@ export default function TickerDetail() {
           </span>
         </div>
         {sparklineData && sparklineData.length > 0 ? (
-          <SparklineChart data={sparklineData} />
+          <InteractiveSparkline data={sparklineData} height={120} />
         ) : (
           <div className="h-32 flex items-center justify-center text-muted-foreground text-xs">
             No chart data available
@@ -146,7 +108,17 @@ export default function TickerDetail() {
       <div className="space-y-3">
         <div className="glass rounded-2xl p-4 flex items-center justify-between">
           <div>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Status</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Status</p>
+              <div className="group relative">
+                <Info size={12} className="text-muted-foreground/60 cursor-help" />
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 px-3 py-2 rounded-lg bg-popover text-popover-foreground text-[11px] shadow-lg border border-border/40 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                  {ticker.is_active
+                    ? "This ticker is in the active trading universe and is monitored for signals."
+                    : "This ticker is not currently monitored for trading signals."}
+                </div>
+              </div>
+            </div>
             <p className="text-sm font-semibold mt-1">{ticker.is_active ? "Active" : "Inactive"}</p>
           </div>
           <div className="flex items-center gap-1 text-muted-foreground">

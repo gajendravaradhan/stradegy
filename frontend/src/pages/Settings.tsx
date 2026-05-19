@@ -24,6 +24,21 @@ export default function Settings() {
     },
   });
 
+  const [riskValues, setRiskValues] = useState({
+    max_drawdown: "",
+    risk_per_trade: "",
+    max_positions: "",
+    stop_atr_mult: "",
+  });
+
+  const [taxValues, setTaxValues] = useState({
+    tax_rate_short_term: "",
+    tax_rate_long_term: "",
+  });
+
+  const [riskEditing, setRiskEditing] = useState(false);
+  const [taxEditing, setTaxEditing] = useState(false);
+
   const handleTradeModeChange = (value: "paper" | "live") => {
     setTradeMode(value);
     updateMutation.mutate({ paper_trading: value === "paper" });
@@ -83,31 +98,145 @@ export default function Settings() {
         </SettingSection>
 
         <SettingSection title="Risk Parameters">
-          {[
-            { label: "Max Drawdown", value: `${(data.max_drawdown * 100).toFixed(0)}%` },
-            { label: "Risk Per Trade", value: `${(data.risk_per_trade * 100).toFixed(0)}%` },
-            { label: "Max Positions", value: String(data.max_positions) },
-            { label: "Stop ATR Multiplier", value: `${data.stop_atr_mult}x` },
-          ].map((param) => (
-            <div
-              key={param.label}
-              className="flex items-center justify-between py-3 border-b border-border/30 last:border-0"
-            >
-              <span className="text-sm text-muted-foreground">{param.label}</span>
-              <span className="text-sm font-mono-value font-semibold">{param.value}</span>
+          {!riskEditing ? (
+            <>
+              {[
+                { label: "Max Drawdown", value: `${(data.max_drawdown * 100).toFixed(0)}%`, key: "max_drawdown" },
+                { label: "Risk Per Trade", value: `${(data.risk_per_trade * 100).toFixed(0)}%`, key: "risk_per_trade" },
+                { label: "Max Positions", value: String(data.max_positions), key: "max_positions" },
+                { label: "Stop ATR Multiplier", value: `${data.stop_atr_mult}x`, key: "stop_atr_mult" },
+              ].map((param) => (
+                <div
+                  key={param.label}
+                  className="flex items-center justify-between py-3 border-b border-border/30 last:border-0"
+                >
+                  <span className="text-sm text-muted-foreground">{param.label}</span>
+                  <span className="text-sm font-mono-value font-semibold">{param.value}</span>
+                </div>
+              ))}
+              <button
+                onClick={() => {
+                  setRiskValues({
+                    max_drawdown: (data.max_drawdown * 100).toFixed(0),
+                    risk_per_trade: (data.risk_per_trade * 100).toFixed(0),
+                    max_positions: String(data.max_positions),
+                    stop_atr_mult: String(data.stop_atr_mult),
+                  });
+                  setRiskEditing(true);
+                }}
+                className="w-full mt-3 py-2 rounded-xl bg-primary/10 text-primary-foreground text-xs font-semibold hover:bg-primary/20 transition-colors"
+              >
+                Edit Risk Parameters
+              </button>
+            </>
+          ) : (
+            <div className="space-y-3">
+              {[
+                { label: "Max Drawdown (%)", key: "max_drawdown" as const },
+                { label: "Risk Per Trade (%)", key: "risk_per_trade" as const },
+                { label: "Max Positions", key: "max_positions" as const },
+                { label: "Stop ATR Multiplier", key: "stop_atr_mult" as const },
+              ].map((field) => (
+                <div key={field.key} className="flex flex-col gap-1">
+                  <label className="text-sm text-muted-foreground">{field.label}</label>
+                  <input
+                    type="number"
+                    value={riskValues[field.key]}
+                    onChange={(e) => setRiskValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                    className="w-full h-10 px-3 rounded-xl bg-secondary/40 border border-border/30 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+              ))}
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    updateMutation.mutate({
+                      max_drawdown: parseFloat(riskValues.max_drawdown) / 100,
+                      risk_per_trade: parseFloat(riskValues.risk_per_trade) / 100,
+                      max_positions: parseInt(riskValues.max_positions, 10),
+                      stop_atr_mult: parseFloat(riskValues.stop_atr_mult),
+                    });
+                    setRiskEditing(false);
+                  }}
+                  disabled={updateMutation.isPending}
+                  className="flex-1 py-2 rounded-xl bg-primary/15 text-primary-foreground text-xs font-semibold hover:bg-primary/25 transition-colors disabled:opacity-50"
+                >
+                  {updateMutation.isPending ? "Saving..." : "Save"}
+                </button>
+                <button
+                  onClick={() => setRiskEditing(false)}
+                  className="flex-1 py-2 rounded-xl bg-secondary/40 text-muted-foreground text-xs font-semibold hover:text-foreground transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-          ))}
+          )}
         </SettingSection>
 
         <SettingSection title="Tax Settings">
-          <div className="flex items-center justify-between py-3 border-b border-border/30 last:border-0">
-            <span className="text-sm text-muted-foreground">Short-Term Rate</span>
-            <span className="text-sm font-mono-value font-semibold">{(data.tax_rate_short_term * 100).toFixed(0)}%</span>
-          </div>
-          <div className="flex items-center justify-between py-3">
-            <span className="text-sm text-muted-foreground">Long-Term Rate</span>
-            <span className="text-sm font-mono-value font-semibold">{(data.tax_rate_long_term * 100).toFixed(0)}%</span>
-          </div>
+          {!taxEditing ? (
+            <>
+              <div className="flex items-center justify-between py-3 border-b border-border/30 last:border-0">
+                <span className="text-sm text-muted-foreground">Short-Term Rate</span>
+                <span className="text-sm font-mono-value font-semibold">{(data.tax_rate_short_term * 100).toFixed(0)}%</span>
+              </div>
+              <div className="flex items-center justify-between py-3">
+                <span className="text-sm text-muted-foreground">Long-Term Rate</span>
+                <span className="text-sm font-mono-value font-semibold">{(data.tax_rate_long_term * 100).toFixed(0)}%</span>
+              </div>
+              <button
+                onClick={() => {
+                  setTaxValues({
+                    tax_rate_short_term: (data.tax_rate_short_term * 100).toFixed(0),
+                    tax_rate_long_term: (data.tax_rate_long_term * 100).toFixed(0),
+                  });
+                  setTaxEditing(true);
+                }}
+                className="w-full mt-3 py-2 rounded-xl bg-primary/10 text-primary-foreground text-xs font-semibold hover:bg-primary/20 transition-colors"
+              >
+                Edit Tax Settings
+              </button>
+            </>
+          ) : (
+            <div className="space-y-3">
+              {[
+                { label: "Short-Term Rate (%)", key: "tax_rate_short_term" as const },
+                { label: "Long-Term Rate (%)", key: "tax_rate_long_term" as const },
+              ].map((field) => (
+                <div key={field.key} className="flex flex-col gap-1">
+                  <label className="text-sm text-muted-foreground">{field.label}</label>
+                  <input
+                    type="number"
+                    value={taxValues[field.key]}
+                    onChange={(e) => setTaxValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                    className="w-full h-10 px-3 rounded-xl bg-secondary/40 border border-border/30 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+              ))}
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    updateMutation.mutate({
+                      tax_rate_short_term: parseFloat(taxValues.tax_rate_short_term) / 100,
+                      tax_rate_long_term: parseFloat(taxValues.tax_rate_long_term) / 100,
+                    });
+                    setTaxEditing(false);
+                  }}
+                  disabled={updateMutation.isPending}
+                  className="flex-1 py-2 rounded-xl bg-primary/15 text-primary-foreground text-xs font-semibold hover:bg-primary/25 transition-colors disabled:opacity-50"
+                >
+                  {updateMutation.isPending ? "Saving..." : "Save"}
+                </button>
+                <button
+                  onClick={() => setTaxEditing(false)}
+                  className="flex-1 py-2 rounded-xl bg-secondary/40 text-muted-foreground text-xs font-semibold hover:text-foreground transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </SettingSection>
 
         <VaultSecretsSection />

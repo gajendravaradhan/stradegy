@@ -2,45 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { TrendingUp, TrendingDown, Activity, Wallet, ChevronDown, LineChart } from "lucide-react";
 import { useState } from "react";
 import { getPortfolio, getSparkline, getTickers, getPortfolioHistory } from "../lib/api";
-
-function SparklineChart({ data }: { data: Array<{ date: string; close: number }> }) {
-  if (!data || data.length < 2) return null;
-
-  const prices = data.map((d) => d.close);
-  const min = Math.min(...prices);
-  const max = Math.max(...prices);
-  const range = max - min || 1;
-  const width = 300;
-  const height = 100;
-
-  const points = prices.map((price, i) => {
-    const x = (i / (prices.length - 1)) * width;
-    const y = height - ((price - min) / range) * (height - 20) - 10;
-    return `${x},${y}`;
-  });
-
-  const isProfit = prices[prices.length - 1] >= prices[0];
-  const strokeColor = isProfit ? "hsl(142 76% 45%)" : "hsl(0 72% 51%)";
-
-  const areaPath = points
-    .map((p, i) => `${i === 0 ? "M" : "L"} ${p}`)
-    .join(" ")
-    .concat(` L ${width},${height} L 0,${height} Z`);
-
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-24" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.3" />
-          <stop offset="100%" stopColor={strokeColor} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={areaPath} fill="url(#areaGrad)" />
-      <polyline fill="none" stroke={strokeColor} strokeWidth="2" points={points.join(" ")} strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={points[points.length - 1].split(",")[0]} cy={points[points.length - 1].split(",")[1]} r="4" fill={strokeColor} stroke="white" strokeWidth="2" />
-    </svg>
-  );
-}
+import InteractiveSparkline from "../components/InteractiveSparkline";
 
 export default function Dashboard() {
   const [selectedTicker, setSelectedTicker] = useState("AAPL");
@@ -139,7 +101,7 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
-          <SparklineChart data={portfolioHistory.history.map((h) => ({ date: h.date, close: h.equity }))} />
+          <InteractiveSparkline data={portfolioHistory.history.map((h) => ({ date: h.date, close: h.equity }))} />
           {portfolioHistory.history.length >= 2 && (
             <div className="flex items-center justify-between mt-3 text-xs">
               <span className="text-muted-foreground">
@@ -190,7 +152,7 @@ export default function Dashboard() {
           </div>
         )}
         {sparklineData && sparklineData.length > 0 ? (
-          <SparklineChart data={sparklineData} />
+          <InteractiveSparkline data={sparklineData} />
         ) : (
           <div className="h-24 flex items-center justify-center text-muted-foreground text-xs">
             No chart data

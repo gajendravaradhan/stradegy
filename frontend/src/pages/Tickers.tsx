@@ -1,8 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Search, BarChart3, Eye, EyeOff, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getTickers, getSparkline } from "../lib/api";
+import { getTickers, getSparkline, toggleWatchTicker } from "../lib/api";
 
 function MiniSparkline({ symbol }: { symbol: string }) {
   const { data } = useQuery({
@@ -40,12 +40,20 @@ function MiniSparkline({ symbol }: { symbol: string }) {
 
 export default function Tickers() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
   const { data: tickers, isLoading } = useQuery({
     queryKey: ["tickers"],
     queryFn: () => getTickers(true),
     refetchInterval: 300_000,
+  });
+
+  const watchMutation = useMutation({
+    mutationFn: (symbol: string) => toggleWatchTicker(symbol),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tickers"] });
+    },
   });
 
   const filtered = tickers?.filter((t) => {
@@ -133,7 +141,17 @@ export default function Tickers() {
               <div className="flex items-center gap-4">
                 <MiniSparkline symbol={ticker.symbol} />
                 <div className="flex items-center gap-1 text-muted-foreground">
-                  {ticker.is_watched ? <Eye size={14} className="text-amber-400" /> : <EyeOff size={14} />}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      watchMutation.mutate(ticker.symbol);
+                    }}
+                    disabled={watchMutation.isPending && watchMutation.variables === ticker.symbol}
+                    className="p-1 rounded-md hover:bg-white/5 transition-colors disabled:opacity-50"
+                    title={ticker.is_watched ? "Remove from watchlist" : "Add to watchlist"}
+                  >
+                    {ticker.is_watched ? <Eye size={14} className="text-amber-400" /> : <EyeOff size={14} />}
+                  </button>
                   <ChevronRight size={14} />
                 </div>
               </div>
