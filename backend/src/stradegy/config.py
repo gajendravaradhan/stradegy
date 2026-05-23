@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "Stradegy"
-    app_version: str = "2.0.0"
+    app_version: str = "3.0.0"
 
     # Server
     host: str = "0.0.0.0"
@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     discord_guild_ids: str = ""
     discord_user_id: str = ""
     discord_general_channel_id: str = ""
+
+    whatsapp_phone_number: str = ""
+    whatsapp_api_key: str = ""
 
     # Paths
     data_dir: Path = Path("data")
