@@ -1,0 +1,10 @@
+/home/gaja/stradegy/logs/*.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644 gaja gaja
+    size 10M
+}

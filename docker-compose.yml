@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  stradegy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stradegy
+    restart: unless-stopped
+    ports:
+      - "3000:8420"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./config:/app/config
+      - ./eval:/app/eval
+      - ./backend/.env:/app/.env:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8420
+      - HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8420/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - stradegy-net
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: stradegy-caddy
+    restart: unless-stopped
+    ports:
+      - "8443:8443"
+    volumes:
+      - ./Caddyfile.nas:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      stradegy:
+        condition: service_healthy
+    networks:
+      - stradegy-net
+
+networks:
+  stradegy-net:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:

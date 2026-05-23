@@ -113,6 +113,27 @@ class PortfolioSnapshot(Base):
     )
 
 
+class Trade(Base):
+    __tablename__ = "trades"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ticker_symbol: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    action: Mapped[str] = mapped_column(String(8), nullable=False)
+    price: Mapped[Decimal] = mapped_column(Numeric(16, 4), nullable=False)
+    shares: Mapped[int] = mapped_column(Integer, nullable=False)
+    strategy: Mapped[str] = mapped_column(String(64), nullable=True)
+    signal_confidence: Mapped[float] = mapped_column(Numeric(5, 4), default=Decimal("0"))
+    order_id: Mapped[str] = mapped_column(String(64), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    pnl: Mapped[Decimal | None] = mapped_column(Numeric(16, 4), nullable=True)
+    fees: Mapped[Decimal] = mapped_column(Numeric(16, 4), default=Decimal("0"))
+    mode: Mapped[str] = mapped_column(String(8), default="paper")
+    gem_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    filled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    notes: Mapped[str] = mapped_column(String(512), nullable=True)
+
+
 async def get_db() -> AsyncSession:
     async with async_session() as session:
         try:

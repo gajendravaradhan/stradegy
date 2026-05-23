@@ -1,0 +1,21 @@
+[Unit]
+Description=Stradegy Trading Bot Backend
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+
+[Service]
+Type=simple
+User=gaja
+WorkingDirectory=/home/gaja/stradegy
+Environment=PYTHONUNBUFFERED=1
+Environment=PATH=/home/gaja/stradegy/.venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/gaja/stradegy/.venv/bin/python -m uvicorn stradegy.main:app --host 0.0.0.0 --port 8420 --app-dir backend/src
+Restart=on-failure
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+StandardOutput=append:/home/gaja/stradegy/logs/backend.log
+StandardError=append:/home/gaja/stradegy/logs/backend.log
+
+[Install]
+WantedBy=multi-user.target
