@@ -24,8 +24,15 @@ class SelfImprovementOrchestrator:
         self.ratchet = RatchetLoop(self.metrics, self.skillbook, self.version_manager)
         self.backtester = WalkForwardBacktester(train_size=252, test_size=63, step_size=63, min_train_size=126)
 
+    async def run_daily_cycle(self, store: DataStore | None = None) -> dict[str, Any]:
+        logger.info("Starting daily self-improvement cycle")
+        return await self._run_cycle(store)
+
     async def run_weekly_cycle(self, store: DataStore | None = None) -> dict[str, Any]:
         logger.info("Starting weekly self-improvement cycle")
+        return await self._run_cycle(store)
+
+    async def _run_cycle(self, store: DataStore | None = None) -> dict[str, Any]:
 
         recommendations = self.analyzer.generate_recommendations()
         if not recommendations:

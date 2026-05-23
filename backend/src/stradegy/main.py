@@ -1,6 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -16,7 +17,7 @@ LOG_FILE = LOG_DIR / "stradegy.log"
 logger.add(LOG_FILE, rotation="10 MB", retention="7 days", level="INFO")
 
 from stradegy.config import settings
-from stradegy.db import get_db, init_db
+from stradegy.db import get_db, init_db, Trade as TradeModel
 
 from stradegy.engine.research.db import (
     DiscordMentionRecord,
@@ -411,6 +412,22 @@ async def approve_alert(gem_id: int):
                             logger.info(
                                 f"Order filled for {gem.ticker_symbol}: {fill_result.get('filled_qty', 0)}/{fill_result.get('qty', 0)} shares"
                             )
+                            filled_qty = float(fill_result.get("filled_qty", sizing["shares"]))
+                            trade = TradeModel(
+                                ticker_symbol=gem.ticker_symbol,
+                                action="buy",
+                                price=Decimal(str(price)),
+                                shares=int(filled_qty),
+                                strategy="ensemble",
+                                signal_confidence=gem.total_score / 100.0,
+                                order_id=str(order_id),
+                                status="filled",
+                                mode="paper" if settings.paper_trading else "live",
+                                gem_id=gem_id,
+                                notes=f"Auto-executed via approve_alert. ATR={atr:.2f}",
+                            )
+                            session.add(trade)
+                            await session.commit()
                         else:
                             logger.warning(
                                 f"Order {order_id} not filled: status={fill_result.get('status')}, timeout={fill_result.get('poll_timeout')}"
@@ -446,6 +463,9 @@ async def get_portfolio():
     equity = 0.0
     buying_power = 0.0
     positions = []
+    day_pnl = 0.0
+    tax_reserve = 0.0
+    realized_gains = 0.0
     try:
         from stradegy.engine.execution.alpaca_client import AlpacaClient
         client = AlpacaClient()
@@ -453,19 +473,39 @@ async def get_portfolio():
         if account:
             equity = account.get("equity", 0.0)
             buying_power = account.get("buying_power", 0.0)
+            day_pnl = account.get("equity", 0.0) - account.get("last_equity", account.get("equity", 0.0))
         positions = await client.get_positions()
     except Exception as e:
         logger.warning(f"Could not fetch Alpaca portfolio: {e}")
 
     from stradegy.engine.risk.tiers import get_tier_config
     tier = get_tier_config(equity)
+
+    async for session in get_db():
+        store = DataStore(session)
+        try:
+            latest_snapshot = await store.get_portfolio_history(days=1)
+            if latest_snapshot and len(latest_snapshot) > 0:
+                snap = latest_snapshot[-1]
+                if equity == 0.0:
+                    equity = float(snap.get("equity", 0.0))
+                    buying_power = float(snap.get("buying_power", 0.0))
+                tax_reserve = float(snap.get("tax_reserve", 0.0))
+                realized_gains = float(snap.get("realized_gains", 0.0))
+                if day_pnl == 0.0:
+                    day_pnl = float(snap.get("day_pnl", 0.0))
+        except Exception as e:
+            logger.warning(f"Could not fetch portfolio snapshot: {e}")
+        break
+
     return {
         "equity": equity,
         "buying_power": buying_power,
-        "tax_reserve": 0.0,
-        "day_pnl": 0.0,
+        "tax_reserve": tax_reserve,
+        "day_pnl": round(day_pnl, 2),
         "open_positions": len(positions),
         "positions": positions,
+        "realized_gains": realized_gains,
         "mode": "paper" if settings.paper_trading else "live",
         "autonomy": settings.autonomy_mode,
         "tier": tier,
@@ -597,6 +637,36 @@ async def update_settings(payload: dict):
         if hasattr(settings, key):
             setattr(settings, key, value)
             changed.append(key)
+
+    env_path = Path(__file__).parent.parent.parent.parent / "secrets" / ".env"
+    if not env_path.exists():
+        env_path = Path(".env")
+
+    lines = []
+    if env_path.exists():
+        with open(env_path, "r") as f:
+            lines = f.readlines()
+
+    env_dict = {}
+    for line in lines:
+        line = line.strip()
+        if line and "=" in line and not line.startswith("#"):
+            k, _, v = line.partition("=")
+            env_dict[k.strip()] = v.strip()
+
+    for key in changed:
+        val = getattr(settings, key)
+        if val is not None:
+            env_dict[key] = str(val).lower() if isinstance(val, bool) else str(val)
+
+    with open(env_path, "w") as f:
+        for k, v in env_dict.items():
+            f.write(f"{k}={v}\n")
+
+    if env_path.exists():
+        import os
+        os.chmod(env_path, 0o600)
+
     return {"success": True, "changed": changed}
 
 
@@ -625,6 +695,211 @@ async def get_tier(equity: float | None = None):
             for t in TIERS
         ],
     }
+
+
+@app.get("/api/trades")
+async def list_trades(
+    ticker: str | None = None,
+    limit: int = Query(default=50, le=500),
+    days: int = Query(default=90, le=365),
+):
+    from sqlalchemy import select
+    async for session in get_db():
+        stmt = select(TradeModel).where(TradeModel.created_at >= (datetime.now(timezone.utc) - timedelta(days=days)))
+        if ticker:
+            stmt = stmt.where(TradeModel.ticker_symbol == ticker.upper())
+        stmt = stmt.order_by(TradeModel.created_at.desc()).limit(limit)
+        result = await session.execute(stmt)
+        trades = result.scalars().all()
+        return {
+            "count": len(trades),
+            "trades": [
+                {
+                    "id": t.id,
+                    "ticker": t.ticker_symbol,
+                    "action": t.action,
+                    "price": float(t.price),
+                    "shares": t.shares,
+                    "strategy": t.strategy,
+                    "status": t.status,
+                    "pnl": float(t.pnl) if t.pnl is not None else None,
+                    "mode": t.mode,
+                    "created_at": t.created_at.isoformat() if t.created_at else None,
+                    "notes": t.notes,
+                }
+                for t in trades
+            ],
+        }
+
+
+@app.get("/api/activity")
+async def get_activity(limit: int = Query(default=20, le=100)):
+    from sqlalchemy import select
+    async for session in get_db():
+        stmt_trades = select(TradeModel).order_by(TradeModel.created_at.desc()).limit(limit)
+        result_trades = await session.execute(stmt_trades)
+        trades = result_trades.scalars().all()
+
+        stmt_gems = select(GemSignalRecord).order_by(GemSignalRecord.created_at.desc()).limit(limit)
+        result_gems = await session.execute(stmt_gems)
+        gems = result_gems.scalars().all()
+
+        activity = []
+        for t in trades:
+            activity.append({
+                "type": "trade",
+                "timestamp": t.created_at.isoformat() if t.created_at else None,
+                "ticker": t.ticker_symbol,
+                "action": t.action,
+                "details": f"{t.action.upper()} {t.shares} shares @ ${float(t.price):.2f}",
+                "status": t.status,
+                "pnl": float(t.pnl) if t.pnl is not None else None,
+            })
+        for g in gems:
+            if g.status != "pending":
+                activity.append({
+                    "type": "gem_action",
+                    "timestamp": g.actioned_at.isoformat() if g.actioned_at else (g.created_at.isoformat() if g.created_at else None),
+                    "ticker": g.ticker_symbol,
+                    "action": g.status,
+                    "details": f"Gem {g.status}: score {g.total_score:.0f}",
+                    "status": g.status,
+                })
+        activity.sort(key=lambda x: x["timestamp"] or "", reverse=True)
+        return {"activity": activity[:limit]}
+
+
+@app.get("/api/data/tickers/{symbol}/research")
+async def get_ticker_research(symbol: str, days: int = 7):
+    from stradegy.engine.research.db import ResearchStore
+    from datetime import datetime, timedelta, timezone
+    async for session in get_db():
+        store = ResearchStore(session)
+        since = datetime.now(timezone.utc) - timedelta(days=days)
+        news = await store.get_news_sentiments(symbol, limit=5)
+        reddit = await store.get_reddit_mentions(symbol, limit=5)
+        discord = await store.get_discord_mentions(symbol, limit=5)
+        sec = await store.get_sec_filings(symbol, limit=3)
+        latest_gem = await store.get_latest_gem_signal(symbol)
+        return {
+            "symbol": symbol.upper(),
+            "news": [
+                {
+                    "headline": n.headline,
+                    "url": n.article_url,
+                    "source": n.source,
+                    "sentiment": n.finbert_label,
+                    "confidence": round(n.finbert_confidence, 2),
+                    "published_at": n.published_at.isoformat() if n.published_at else None,
+                }
+                for n in news
+            ],
+            "reddit": [
+                {
+                    "title": r.title,
+                    "url": r.post_url,
+                    "subreddit": r.subreddit,
+                    "score": r.score,
+                    "sentiment": round(r.sentiment_compound, 2),
+                }
+                for r in reddit
+            ],
+            "discord": [
+                {
+                    "content": d.content[:200],
+                    "url": d.message_url,
+                    "channel": d.channel_name,
+                    "reactions": d.num_reactions,
+                    "sentiment": round(d.sentiment_compound, 2),
+                }
+                for d in discord
+            ],
+            "sec": [
+                {
+                    "filing_type": s.filing_type,
+                    "filing_date": s.filing_date.isoformat() if s.filing_date else None,
+                    "url": s.filing_url,
+                    "revenue_growth": s.revenue_growth_yoy,
+                    "insider_net_buys": s.insider_net_buys,
+                }
+                for s in sec
+            ],
+            "latest_gem": {
+                "score": latest_gem.total_score if latest_gem else None,
+                "classification": latest_gem.classification if latest_gem else None,
+                "source_count": latest_gem.source_count if latest_gem else None,
+                "status": latest_gem.status if latest_gem else None,
+                "created_at": latest_gem.created_at.isoformat() if latest_gem and latest_gem.created_at else None,
+            } if latest_gem else None,
+        }
+
+
+@app.get("/api/health/detailed")
+async def detailed_health():
+    from sqlalchemy import select, func
+    from stradegy.db import Ticker, OHLCV, Trade as TradeModel
+    from stradegy.engine.research.db import GemSignalRecord
+    from stradegy.engine.data.ticker_universe import TickerUniverse
+    health = {
+        "version": settings.app_version,
+        "mode": "paper" if settings.paper_trading else "live",
+        "autonomy": settings.autonomy_mode,
+        "alpaca_connected": False,
+        "finnhub_connected": bool(settings.finnhub_api_key),
+        "discord_connected": bool(settings.discord_bot_token),
+    }
+    try:
+        from stradegy.engine.execution.alpaca_client import AlpacaClient
+        client = AlpacaClient()
+        account = await client.get_account()
+        health["alpaca_connected"] = bool(account)
+    except Exception:
+        pass
+    try:
+        from stradegy.engine.research.news_scanner import NewsScanner
+        ns = NewsScanner()
+        health["finnhub_connected"] = ns._ensure_client()
+    except Exception:
+        pass
+    async for session in get_db():
+        store = DataStore(session)
+        ticker_count = await session.scalar(select(func.count()).select_from(Ticker))
+        ohlcv_count = await session.scalar(select(func.count()).select_from(OHLCV))
+        gem_count = await session.scalar(select(func.count()).select_from(GemSignalRecord))
+        trade_count = await session.scalar(select(func.count()).select_from(TradeModel))
+        active_tickers = await store.get_active_tickers()
+        latest_gem = await session.execute(select(GemSignalRecord).order_by(GemSignalRecord.created_at.desc()).limit(1))
+        latest_gem = latest_gem.scalar_one_or_none()
+        health["data"] = {
+            "tickers": ticker_count,
+            "ohlcv_rows": ohlcv_count,
+            "gems": gem_count,
+            "trades": trade_count,
+            "active_tickers": len(active_tickers),
+            "latest_gem_at": latest_gem.created_at.isoformat() if latest_gem and latest_gem.created_at else None,
+        }
+        break
+    return health
+
+
+@app.post("/api/research/scan")
+async def trigger_research_scan(scan_type: str = Query(default="incremental", alias="type")):
+    from stradegy.engine.research.orchestrator import ResearchOrchestrator
+    orchestrator = ResearchOrchestrator()
+    try:
+        if scan_type == "full":
+            result = await orchestrator.run_market_open_scan()
+        elif scan_type == "close":
+            result = await orchestrator.run_close_scan()
+        elif scan_type == "weekend":
+            result = await orchestrator.run_weekend_deep()
+        else:
+            result = await orchestrator.run_incremental_scan()
+        await ws_manager.broadcast({"type": "alerts_update"})
+        return {"success": True, "message": f"{scan_type} scan triggered", "result": str(result)}
+    except Exception as e:
+        logger.error(f"Manual scan failed: {e}")
+        return {"success": False, "error": str(e)}
 
 
 @app.post("/api/backtest/run")
@@ -764,7 +1039,7 @@ async def run_self_improvement_cycle():
         orchestrator = SelfImprovementOrchestrator()
         async for session in get_db():
             store = DataStore(session)
-            result = await orchestrator.run_weekly_cycle(store)
+            result = await orchestrator.run_daily_cycle(store)
             logger.info(f"Self-improvement cycle result: {result}")
             await ws_manager.broadcast({"type": "metrics_update"})
             break
@@ -937,14 +1212,13 @@ def schedule_jobs():
     scheduler.add_job(
         run_self_improvement_cycle,
         "cron",
-        day_of_week="sun",
         hour=2,
         minute=0,
-        id="self_improvement_weekly",
+        id="self_improvement_daily",
         replace_existing=True,
         misfire_grace_time=3600,
     )
-    logger.info("Scheduled weekly self-improvement cycle for Sunday 02:00 UTC")
+    logger.info("Scheduled daily self-improvement cycle for 02:00 UTC")
 
     scheduler.add_job(
         send_daily_discord_report,
@@ -1031,6 +1305,159 @@ def schedule_jobs():
         logger.info("Scheduled research pipeline jobs")
     except Exception as e:
         logger.warning(f"Failed to schedule research jobs: {e}")
+
+    try:
+        from stradegy.engine.monitoring.price_monitor import PriceMonitor
+        from stradegy.engine.monitoring.risk_monitor import RiskMonitor
+        from stradegy.engine.monitoring.data_quality import DataQualityAuditor
+        from stradegy.engine.monitoring.correlation_monitor import CorrelationMonitor
+        from stradegy.engine.research.premarket_scan import PreMarketScanner
+        from stradegy.engine.research.paper_trade_logger import PaperTradeLogger
+        from stradegy.engine.backtest.overnight_backtest import OvernightBacktestRunner
+        from stradegy.engine.alerts.whatsapp_alerts import WhatsAppAlertManager
+
+        async def _run_price_monitor():
+            from stradegy.engine.data.store import DataStore
+            monitor = PriceMonitor()
+            try:
+                async with async_session() as session:
+                    store = DataStore(session)
+                    tickers = await store.get_active_tickers()
+                    await monitor.check_price_movements([t.symbol for t in tickers[:50]])
+            finally:
+                await monitor.close()
+
+        async def _run_risk_monitor():
+            monitor = RiskMonitor()
+            whatsapp = WhatsAppAlertManager()
+            try:
+                result = await monitor.check_portfolio_risk()
+                for alert in result.get("alerts", []):
+                    if alert["severity"] == "critical" and monitor.should_alert(alert["type"], cooldown_minutes=60):
+                        msg = f"CRITICAL RISK: {alert['message']}"
+                        logger.warning(msg)
+                        if whatsapp.enabled:
+                            whatsapp.send_risk_alert(alert["type"], alert["message"])
+            finally:
+                pass
+
+        async def _run_premarket_scan():
+            scanner = PreMarketScanner()
+            try:
+                result = await scanner.scan()
+                if result.get("watchlist"):
+                    logger.info(f"Pre-market watchlist: {len(result['watchlist'])} tickers")
+            finally:
+                await scanner.insider.close()
+                await scanner.earnings.close()
+
+        async def _run_paper_trades():
+            from stradegy.engine.data.store import DataStore
+            logger_instance = PaperTradeLogger()
+            async with async_session() as session:
+                store = DataStore(session)
+                tickers = await store.get_active_tickers()
+                await logger_instance.log_signals([t.symbol for t in tickers[:30]])
+
+        async def _run_data_quality():
+            auditor = DataQualityAuditor()
+            await auditor.run_audit()
+
+        async def _run_correlation():
+            monitor = CorrelationMonitor()
+            await monitor.check_drift()
+
+        async def _run_overnight_backtest():
+            runner = OvernightBacktestRunner()
+            await runner.run_nightly()
+
+        scheduler.add_job(
+            _run_price_monitor,
+            "cron",
+            day_of_week="mon-fri",
+            hour="13-20",
+            minute="*/15",
+            id="price_monitor",
+            replace_existing=True,
+            misfire_grace_time=300,
+            max_instances=1,
+        )
+        logger.info("Scheduled price monitor every 15min during market hours")
+
+        scheduler.add_job(
+            _run_premarket_scan,
+            "cron",
+            day_of_week="mon-fri",
+            hour=13,
+            minute=0,
+            id="premarket_scan",
+            replace_existing=True,
+            misfire_grace_time=600,
+        )
+        logger.info("Scheduled pre-market scan for 13:00 UTC Mon-Fri")
+
+        scheduler.add_job(
+            _run_risk_monitor,
+            "cron",
+            day_of_week="mon-fri",
+            hour="13-20",
+            minute="*/5",
+            id="risk_monitor",
+            replace_existing=True,
+            misfire_grace_time=120,
+            max_instances=1,
+        )
+        logger.info("Scheduled risk monitor every 5min during market hours")
+
+        scheduler.add_job(
+            _run_paper_trades,
+            "cron",
+            day_of_week="mon-fri",
+            hour="13-20",
+            minute="*/15",
+            id="paper_trade_logger",
+            replace_existing=True,
+            misfire_grace_time=300,
+            max_instances=1,
+        )
+        logger.info("Scheduled paper trade logger every 15min during market hours")
+
+        scheduler.add_job(
+            _run_data_quality,
+            "cron",
+            hour=3,
+            minute=0,
+            id="data_quality_audit",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        logger.info("Scheduled data quality audit for 03:00 UTC daily")
+
+        scheduler.add_job(
+            _run_correlation,
+            "cron",
+            day_of_week="sun",
+            hour=1,
+            minute=0,
+            id="correlation_drift",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        logger.info("Scheduled correlation drift check for Sunday 01:00 UTC")
+
+        scheduler.add_job(
+            _run_overnight_backtest,
+            "cron",
+            day_of_week="mon-thu,sun",
+            hour=22,
+            minute=0,
+            id="overnight_backtest",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        logger.info("Scheduled overnight backtest for 22:00 UTC Mon-Thu + Sun")
+    except Exception as e:
+        logger.warning(f"Failed to schedule monitoring jobs: {e}")
 
 
 schedule_jobs()
