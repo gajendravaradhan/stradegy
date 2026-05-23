@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Sparkles, Check, X, Loader2 } from "lucide-react";
-import { getAlerts, approveAlert, rejectAlert, type AlertResponse } from "../lib/api";
+import { Sparkles, Check, X, Loader2, RefreshCw, Shield, Zap, Activity, Server } from "lucide-react";
+import { getAlerts, approveAlert, rejectAlert, getHealth, triggerScan, type AlertResponse } from "../lib/api";
 
 function ScoreRing({ score, size = 48 }: { score: number; size?: number }) {
   const circumference = 2 * Math.PI * ((size - 4) / 2);
@@ -39,6 +39,20 @@ export default function Alerts() {
     refetchInterval: 60_000,
   });
 
+  const { data: health } = useQuery({
+    queryKey: ["health"],
+    queryFn: () => getHealth(),
+    refetchInterval: 300_000,
+  });
+
+  const scanMutation = useMutation({
+    mutationFn: () => triggerScan("incremental"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["tickers"] });
+    },
+  });
+
   const approveMutation = useMutation({
     mutationFn: approveAlert,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["alerts"] }),
@@ -63,10 +77,57 @@ export default function Alerts() {
   }
 
   const alerts = data || [];
+  const mode = health?.mode || "paper";
+  const autonomy = health?.autonomy || "semi";
 
   return (
     <div className="p-6 pb-28 animate-fade-in-up">
-      <h1 className="text-xl font-semibold mb-6">Hidden Gems</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-xl font-semibold">Hidden Gems</h1>
+        <button
+          onClick={() => scanMutation.mutate()}
+          disabled={scanMutation.isPending}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/10 text-primary text-xs font-semibold hover:bg-primary/20 transition-colors disabled:opacity-50"
+        >
+          {scanMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          Scan Now
+        </button>
+      </div>
+
+      <div className="glass rounded-2xl p-4 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Server size={14} className="text-muted-foreground" />
+            <p className="text-[11px] text-muted-foreground tracking-[0.15em] uppercase font-medium">System Status</p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className={`w-1.5 h-1.5 rounded-full ${health?.alpaca_connected ? "bg-emerald-400" : "bg-rose-400"}`} />
+            <span className="text-[10px] text-muted-foreground">{health?.alpaca_connected ? "Online" : "Offline"}</span>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            <Shield size={12} className="text-muted-foreground" />
+            <span className="text-muted-foreground">Mode:</span>
+            <span className={`font-semibold ${mode === "live" ? "text-emerald-400" : "text-amber-400"}`}>{mode === "live" ? "Live" : "Paper"}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Zap size={12} className="text-muted-foreground" />
+            <span className="text-muted-foreground">Autonomy:</span>
+            <span className={`font-semibold ${autonomy === "full" ? "text-emerald-400" : "text-amber-400"}`}>{autonomy === "full" ? "Full" : "Semi"}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Activity size={12} className="text-muted-foreground" />
+            <span className="text-muted-foreground">Tickers:</span>
+            <span className="font-mono-value font-semibold">{health?.data?.active_tickers || 0} active</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Sparkles size={12} className="text-muted-foreground" />
+            <span className="text-muted-foreground">Gems:</span>
+            <span className="font-mono-value font-semibold">{health?.data?.gems || 0} found</span>
+          </div>
+        </div>
+      </div>
 
       {alerts.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">

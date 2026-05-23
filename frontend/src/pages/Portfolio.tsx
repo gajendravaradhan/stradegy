@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { TrendingUp, TrendingDown, Wallet, Receipt, Layers, Activity, Target, Zap, BarChart3, Award } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, Receipt, Layers, Activity, Target, Zap, BarChart3, Award, ArrowLeftRight } from "lucide-react";
 import { useState } from "react";
-import { getPortfolio, getTier, getPerformanceMetrics } from "../lib/api";
+import { getPortfolio, getTier, getPerformanceMetrics, getTrades } from "../lib/api";
 
 export default function Portfolio() {
   const [tab, setTab] = useState<"positions" | "history">("positions");
@@ -15,6 +15,11 @@ export default function Portfolio() {
     queryFn: () => getTier(data?.equity),
     enabled: !!data,
     staleTime: 300_000,
+  });
+  const { data: tradesData, isLoading: tradesLoading } = useQuery({
+    queryKey: ["trades"],
+    queryFn: () => getTrades(undefined, 50, 90),
+    refetchInterval: 60_000,
   });
 
   if (isLoading || !data) {
@@ -136,6 +141,47 @@ export default function Portfolio() {
             ))}
           </div>
         )
+      ) : tradesLoading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-16 bg-muted/40 rounded-2xl animate-pulse" />
+          ))}
+        </div>
+      ) : tradesData && tradesData.trades.length > 0 ? (
+        <div className="space-y-3">
+          {tradesData.trades.map((trade, i) => (
+            <div key={i} className="glass rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                    trade.action === "buy" ? "bg-emerald-500/10" : "bg-rose-500/10"
+                  }`}>
+                    <ArrowLeftRight size={14} className={trade.action === "buy" ? "text-emerald-400" : "text-rose-400"} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">{trade.ticker}</p>
+                    <p className="text-[10px] text-muted-foreground">{trade.action.toUpperCase()} {trade.shares} @ ${trade.price.toFixed(2)}</p>
+                  </div>
+                </div>
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider border ${
+                  trade.status === "filled" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" :
+                  trade.status === "pending" ? "bg-amber-500/15 text-amber-400 border-amber-500/20" :
+                  "bg-rose-500/15 text-rose-400 border-rose-500/20"
+                }`}>
+                  {trade.status}
+                </span>
+              </div>
+              {trade.pnl !== null && trade.pnl !== undefined && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">{trade.strategy || "Manual"}</span>
+                  <span className={`font-mono-value font-medium ${trade.pnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                    {trade.pnl >= 0 ? "+" : ""}${trade.pnl.toFixed(2)}
+                  </span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
           <p className="text-sm font-medium">No trade history yet</p>
@@ -148,9 +194,9 @@ export default function Portfolio() {
           <p className="text-[11px] text-muted-foreground tracking-[0.15em] uppercase font-medium">Tax Summary</p>
         </div>
         <div className="space-y-3">
-          <TaxRow label="Realized Gains" value="$0.00" />
-          <TaxRow label="Tax Reserve (30%)" value="$0.00" accent="amber" />
-          <TaxRow label="Available" value="$0.00" />
+          <TaxRow label="Realized Gains" value={`$${(data.realized_gains || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+          <TaxRow label="Tax Reserve (30%)" value={`$${data.tax_reserve.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} accent="amber" />
+          <TaxRow label="Available" value={`$${Math.max(0, (data.realized_gains || 0) - data.tax_reserve).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
         </div>
       </div>
     </div>

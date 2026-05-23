@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, BarChart3, Eye, EyeOff, ChevronRight } from "lucide-react";
+import { Search, BarChart3, Eye, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getTickers, getSparkline, toggleWatchTicker } from "../lib/api";
+import { getWatchlist, getSparkline, toggleWatchTicker } from "../lib/api";
 
 function MiniSparkline({ symbol }: { symbol: string }) {
   const { data } = useQuery({
@@ -38,39 +38,35 @@ function MiniSparkline({ symbol }: { symbol: string }) {
   );
 }
 
-export default function Tickers() {
+export default function Watchlist() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
-  const [selectedSector, setSelectedSector] = useState<string | null>(null);
   const { data: tickers, isLoading } = useQuery({
-    queryKey: ["tickers"],
-    queryFn: () => getTickers(true),
+    queryKey: ["watchlist"],
+    queryFn: () => getWatchlist(),
     refetchInterval: 300_000,
   });
 
   const watchMutation = useMutation({
     mutationFn: (symbol: string) => toggleWatchTicker(symbol),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["watchlist"] });
       queryClient.invalidateQueries({ queryKey: ["tickers"] });
     },
   });
 
   const filtered = tickers?.filter((t) => {
     const q = query.toUpperCase();
-    const matchesQuery = t.symbol.toUpperCase().includes(q) || (t.name || "").toUpperCase().includes(q);
-    const matchesSector = selectedSector ? t.sector === selectedSector : true;
-    return matchesQuery && matchesSector;
+    return t.symbol.toUpperCase().includes(q) || (t.name || "").toUpperCase().includes(q);
   });
-
-  const sectors = [...new Set((tickers || []).map((t) => t.sector).filter(Boolean))];
 
   return (
     <div className="p-6 pb-28 animate-fade-in-up">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold">Tickers</h1>
+        <h1 className="text-xl font-semibold">Watchlist</h1>
         <span className="text-xs text-muted-foreground font-mono-value">
-          {filtered?.length || 0} of {tickers?.length || 0}
+          {filtered?.length || 0} tickers
         </span>
       </div>
 
@@ -78,44 +74,16 @@ export default function Tickers() {
         <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
         <input
           type="text"
-          placeholder="Search symbol or name..."
+          placeholder="Search watchlist..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="w-full h-11 pl-10 pr-4 rounded-xl bg-secondary/40 border border-border/30 text-sm text-black placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
         />
       </div>
 
-      {sectors.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-4 mb-2 scrollbar-hide">
-          <button
-            onClick={() => setSelectedSector(null)}
-            className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-colors ${
-              selectedSector === null
-                ? "bg-primary/15 text-primary-foreground"
-                : "bg-secondary/40 text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            All
-          </button>
-          {sectors.map((s) => (
-            <button
-              key={s}
-              onClick={() => setSelectedSector(s === selectedSector ? null : s)}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-medium whitespace-nowrap transition-colors ${
-                selectedSector === s
-                  ? "bg-primary/15 text-primary-foreground"
-                  : "bg-secondary/40 text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
-
       {isLoading ? (
         <div className="space-y-3">
-          {[1, 2, 3, 4, 5].map((i) => (
+          {[1, 2, 3].map((i) => (
             <div key={i} className="h-16 bg-muted/40 rounded-2xl animate-pulse" />
           ))}
         </div>
@@ -148,9 +116,9 @@ export default function Tickers() {
                     }}
                     disabled={watchMutation.isPending && watchMutation.variables === ticker.symbol}
                     className="p-1 rounded-md hover:bg-white/5 transition-colors disabled:opacity-50"
-                    title={ticker.is_watched ? "Remove from watchlist" : "Add to watchlist"}
+                    title="Remove from watchlist"
                   >
-                    {ticker.is_watched ? <Eye size={14} className="text-amber-400" /> : <EyeOff size={14} />}
+                    <Eye size={14} className="text-amber-400" />
                   </button>
                   <ChevronRight size={14} />
                 </div>
@@ -161,7 +129,10 @@ export default function Tickers() {
       ) : (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
           <BarChart3 size={28} className="opacity-30 mb-3" />
-          <p className="text-sm">No tickers found</p>
+          <p className="text-sm">No tickers on watchlist</p>
+          <p className="text-xs mt-2 max-w-[240px] text-center leading-relaxed">
+            Tap the eye icon on any ticker to add it here
+          </p>
         </div>
       )}
     </div>

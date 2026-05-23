@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { TrendingUp, TrendingDown, Activity, Wallet, ChevronDown, LineChart } from "lucide-react";
+import { TrendingUp, TrendingDown, Activity, Wallet, ChevronDown, LineChart, Zap, Check, X } from "lucide-react";
 import { useState } from "react";
-import { getPortfolio, getSparkline, getTickers, getPortfolioHistory } from "../lib/api";
+import { getPortfolio, getSparkline, getTickers, getPortfolioHistory, getActivity } from "../lib/api";
 import InteractiveSparkline from "../components/InteractiveSparkline";
 
 export default function Dashboard() {
@@ -31,6 +31,12 @@ export default function Dashboard() {
     queryKey: ["portfolio_history", portfolioPeriod],
     queryFn: () => getPortfolioHistory(portfolioPeriod),
     refetchInterval: 300_000,
+  });
+
+  const { data: activityData, isLoading: activityLoading } = useQuery({
+    queryKey: ["activity"],
+    queryFn: () => getActivity(10),
+    refetchInterval: 60_000,
   });
 
   if (isLoading || !data) {
@@ -205,9 +211,44 @@ export default function Dashboard() {
           <Activity size={14} className="text-muted-foreground" />
           <p className="text-[11px] text-muted-foreground tracking-[0.15em] uppercase font-medium">Recent Activity</p>
         </div>
-        <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-          <p className="text-sm">No recent activity</p>
-        </div>
+        {activityLoading ? (
+          <div className="space-y-3">
+            {[1, 2].map((i) => (
+              <div key={i} className="h-10 bg-muted/40 rounded-xl animate-pulse" />
+            ))}
+          </div>
+        ) : activityData && activityData.activity.length > 0 ? (
+          <div className="space-y-3">
+            {activityData.activity.map((item, i) => (
+              <div key={i} className="flex items-center gap-3 py-2 border-b border-border/20 last:border-0">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                  item.type === "trade" ? "bg-primary/10" :
+                  item.status === "approved" || item.status === "executed" ? "bg-emerald-500/10" :
+                  item.status === "rejected" ? "bg-rose-500/10" :
+                  "bg-amber-500/10"
+                }`}>
+                  {item.type === "trade" ? <Zap size={14} className="text-primary" /> :
+                   item.status === "approved" || item.status === "executed" ? <Check size={14} className="text-emerald-400" /> :
+                   item.status === "rejected" ? <X size={14} className="text-rose-400" /> :
+                   <Activity size={14} className="text-amber-400" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium truncate">{item.details}</p>
+                  <p className="text-[10px] text-muted-foreground">{item.ticker}</p>
+                </div>
+                {item.pnl !== null && item.pnl !== undefined && (
+                  <span className={`text-xs font-mono-value font-medium ${item.pnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                    {item.pnl >= 0 ? "+" : ""}${item.pnl.toFixed(2)}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+            <p className="text-sm">No recent activity</p>
+          </div>
+        )}
       </div>
     </div>
   );

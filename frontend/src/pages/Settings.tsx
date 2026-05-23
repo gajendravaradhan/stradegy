@@ -143,7 +143,7 @@ export default function Settings() {
                     type="number"
                     value={riskValues[field.key]}
                     onChange={(e) => setRiskValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
-                    className="w-full h-10 px-3 rounded-xl bg-secondary/40 border border-border/30 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    className="w-full h-10 px-3 rounded-xl bg-secondary/40 border border-border/30 text-sm text-black focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
               ))}
@@ -210,7 +210,7 @@ export default function Settings() {
                     type="number"
                     value={taxValues[field.key]}
                     onChange={(e) => setTaxValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
-                    className="w-full h-10 px-3 rounded-xl bg-secondary/40 border border-border/30 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    className="w-full h-10 px-3 rounded-xl bg-secondary/40 border border-border/30 text-sm text-black focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
               ))}
@@ -316,7 +316,7 @@ function VaultSecretsSection() {
                   value={displayValue}
                   placeholder={currentValue ? "••••••••" : "Not set"}
                   onChange={(e) => setInputs((prev) => ({ ...prev, [f.key]: e.target.value }))}
-                  className="w-full bg-secondary/40 border border-border/50 rounded-xl px-3 py-2.5 text-sm font-mono-value focus:outline-none focus:border-primary/50 transition-colors"
+                  className="w-full bg-secondary/40 border border-border/50 rounded-xl px-3 py-2.5 text-sm text-black font-mono-value focus:outline-none focus:border-primary/50 transition-colors"
                 />
                 {f.masked && (
                   <button
@@ -391,10 +391,10 @@ function RadioGroup({
         <button
           key={opt.value}
           onClick={() => onChange(opt.value)}
-          className={`w-full text-left p-3 rounded-xl transition-all ${
+          className={`w-full text-left p-3 rounded-xl transition-all border ${
             value === opt.value
-              ? "bg-primary/15 text-primary-foreground border border-primary/20"
-              : "text-muted-foreground hover:bg-white/5"
+              ? "bg-primary/25 text-primary-foreground border-primary/40 ring-1 ring-primary/20"
+              : "text-muted-foreground hover:bg-white/5 border-transparent"
           }`}
         >
           <div className="flex items-center gap-3">

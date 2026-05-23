@@ -86,6 +86,12 @@ export function getTickers(activeOnly = true) {
   );
 }
 
+export function getWatchlist() {
+  return fetchApi<Array<{ symbol: string; name: string | null; sector: string | null; is_active: boolean; is_watched: boolean }>>(
+    `/data/tickers?active_only=true&watched_only=true`
+  );
+}
+
 export function getTickerDetail(symbol: string) {
   return fetchApi<{ symbol: string; name: string | null; sector: string | null; is_active: boolean; is_watched: boolean }>(
     `/data/tickers/${symbol}`
@@ -127,6 +133,52 @@ export function getPerformanceMetrics(days = 90) {
   }>(`/portfolio/metrics?days=${days}`);
 }
 
+export function getTickerResearch(symbol: string, days = 7) {
+  return fetchApi<{
+    symbol: string;
+    news: Array<{ headline: string; url: string; source: string; sentiment: string; confidence: number; published_at: string | null }>;
+    reddit: Array<{ title: string; url: string; subreddit: string; score: number; sentiment: number }>;
+    discord: Array<{ content: string; url: string; channel: string; reactions: number; sentiment: number }>;
+    sec: Array<{ filing_type: string; filing_date: string | null; url: string; revenue_growth: number | null; insider_net_buys: number | null }>;
+    latest_gem: { score: number | null; classification: string | null; source_count: number | null; status: string | null; created_at: string | null } | null;
+  }>(`/data/tickers/${symbol}/research?days=${days}`);
+}
+
+export function getActivity(limit = 20) {
+  return fetchApi<{
+    activity: Array<{
+      type: string;
+      timestamp: string | null;
+      ticker: string;
+      action: string;
+      details: string;
+      status: string;
+      pnl: number | null;
+    }>;
+  }>(`/activity?limit=${limit}`);
+}
+
+export function getTrades(ticker?: string, limit = 50, days = 90) {
+  let url = `/trades?limit=${limit}&days=${days}`;
+  if (ticker) url += `&ticker=${ticker}`;
+  return fetchApi<{
+    count: number;
+    trades: Array<{
+      id: number;
+      ticker: string;
+      action: string;
+      price: number;
+      shares: number;
+      strategy: string | null;
+      status: string;
+      pnl: number | null;
+      mode: string;
+      created_at: string | null;
+      notes: string | null;
+    }>;
+  }>(url);
+}
+
 export interface AlertResponse {
   id: number;
   ticker: string;
@@ -149,6 +201,7 @@ interface PortfolioResponse {
   day_pnl: number;
   open_positions: number;
   positions: Position[];
+  realized_gains: number;
   mode: string;
   autonomy: string;
 }
@@ -191,6 +244,29 @@ interface BacktestStrategy {
   key: string;
   name: string;
   description: string;
+}
+
+export function getHealth() {
+  return fetchApi<{
+    version: string;
+    mode: string;
+    autonomy: string;
+    alpaca_connected: boolean;
+    finnhub_connected: boolean;
+    discord_connected: boolean;
+    data: {
+      tickers: number;
+      ohlcv_rows: number;
+      gems: number;
+      trades: number;
+      active_tickers: number;
+      latest_gem_at: string | null;
+    };
+  }>("/health/detailed");
+}
+
+export function triggerScan(type: "incremental" | "full" = "incremental") {
+  return fetchApi<{ success: boolean; message: string }>(`/research/scan?type=${type}`, { method: "POST" });
 }
 
 interface BacktestResult {

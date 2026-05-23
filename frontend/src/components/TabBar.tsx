@@ -19,7 +19,7 @@ export default function TabBar({ tabs, currentPath }: TabBarProps) {
     <div className="absolute bottom-0 left-0 right-0 z-50 pb-[calc(env(safe-area-inset-bottom,0px)+8px)] px-6">
       <nav className="glass-strong rounded-2xl h-14 flex items-center justify-around">
         {tabs.map((tab) => {
-          const active = currentPath === tab.path;
+          const active = currentPath === tab.path || (tab.path !== "/" && currentPath.startsWith(tab.path));
           const Icon = tab.icon;
           return (
             <button
