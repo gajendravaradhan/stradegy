@@ -3,23 +3,30 @@ from typing import Any
 from loguru import logger
 
 from stradegy.engine.research.models import (
+    EarningsSignal,
     GemClassification,
     GemSignal,
+    InsiderSignal,
     SECFiling,
     SignalSource,
     SourceScore,
     TechnicalScore,
+    TrendsSignal,
 )
 
 
 class GemDetector:
     def __init__(self):
         self.weights = {
-            SignalSource.REDDIT: 25.0,
-            SignalSource.DISCORD: 25.0,
-            SignalSource.SEC: 30.0,
-            SignalSource.NEWS: 20.0,
-            SignalSource.TECHNICAL: 25.0,
+            SignalSource.REDDIT: 20.0,
+            SignalSource.DISCORD: 20.0,
+            SignalSource.STOCKTWITS: 15.0,
+            SignalSource.INSIDER: 15.0,
+            SignalSource.TRENDS: 10.0,
+            SignalSource.EARNINGS: 10.0,
+            SignalSource.SEC: 20.0,
+            SignalSource.NEWS: 15.0,
+            SignalSource.TECHNICAL: 20.0,
         }
 
     def score_reddit(self, mentions: list[dict[str, Any]]) -> SourceScore:
@@ -152,17 +159,118 @@ class GemDetector:
             weighted_score=round(score, 2),
         )
 
+    def score_stocktwits(self, mentions: list[dict[str, Any]]) -> SourceScore:
+        if not mentions:
+            return SourceScore(
+                source=SignalSource.STOCKTWITS,
+                raw_score=0.0,
+                weight=self.weights[SignalSource.STOCKTWITS],
+                weighted_score=0.0,
+            )
+        avg_sentiment = sum(m.get("sentiment_compound", 0) for m in mentions) / len(mentions)
+        avg_likes = sum(m.get("likes", 0) for m in mentions) / len(mentions)
+        avg_reshares = sum(m.get("reshares", 0) for m in mentions) / len(mentions)
+        watchlist = max(m.get("watchlist_count", 0) for m in mentions)
+        engagement = min((avg_likes + avg_reshares * 2) / 20.0 * 10.0, 10.0)
+        sentiment = min(max(avg_sentiment, 0) / 0.6 * 5.0, 5.0)
+        trending = min(watchlist / 5000.0 * 5.0, 5.0)
+        raw_score = engagement + sentiment + trending
+        return SourceScore(
+            source=SignalSource.STOCKTWITS,
+            raw_score=round(raw_score, 2),
+            weight=self.weights[SignalSource.STOCKTWITS],
+            weighted_score=round(raw_score, 2),
+            evidence=[m.get("message_url", "") for m in mentions[:3]],
+        )
+
+    def score_insider(self, signals: list[InsiderSignal]) -> SourceScore:
+        if not signals:
+            return SourceScore(
+                source=SignalSource.INSIDER,
+                raw_score=0.0,
+                weight=self.weights[SignalSource.INSIDER],
+                weighted_score=0.0,
+            )
+        purchases = [s for s in signals if s.transaction_type in ("P - Purchase", "P")]
+        cluster = any(s.is_cluster for s in purchases)
+        total_value = sum(s.total_value for s in purchases)
+        score = 0.0
+        if cluster:
+            score += 10.0
+        elif len(purchases) >= 1:
+            score += 5.0
+        if total_value > 100000:
+            score += 5.0
+        evidence = [s.filing_url for s in purchases[:3] if s.filing_url]
+        return SourceScore(
+            source=SignalSource.INSIDER,
+            raw_score=round(score, 2),
+            weight=self.weights[SignalSource.INSIDER],
+            weighted_score=round(score, 2),
+            evidence=evidence,
+        )
+
+    def score_trends(self, trend: TrendsSignal | None) -> SourceScore:
+        if not trend or trend.interest_score <= 0:
+            return SourceScore(
+                source=SignalSource.TRENDS,
+                raw_score=0.0,
+                weight=self.weights[SignalSource.TRENDS],
+                weighted_score=0.0,
+            )
+        score = min(trend.interest_score / 100.0 * 7.0, 7.0)
+        if trend.direction == "up" and trend.interest_vs_90d_avg > 0.3:
+            score += 3.0
+        elif trend.direction == "up":
+            score += 1.5
+        return SourceScore(
+            source=SignalSource.TRENDS,
+            raw_score=round(score, 2),
+            weight=self.weights[SignalSource.TRENDS],
+            weighted_score=round(score, 2),
+        )
+
+    def score_earnings(self, earnings: list[EarningsSignal]) -> SourceScore:
+        if not earnings:
+            return SourceScore(
+                source=SignalSource.EARNINGS,
+                raw_score=0.0,
+                weight=self.weights[SignalSource.EARNINGS],
+                weighted_score=0.0,
+            )
+        upcoming = [e for e in earnings if e.is_upcoming and e.days_until <= 7]
+        past_surprises = [e for e in earnings if e.surprise_pct is not None and e.surprise_pct > 20]
+        score = 0.0
+        if upcoming:
+            score += 3.0
+        if past_surprises:
+            score += min(len(past_surprises) * 3.5, 7.0)
+        return SourceScore(
+            source=SignalSource.EARNINGS,
+            raw_score=round(score, 2),
+            weight=self.weights[SignalSource.EARNINGS],
+            weighted_score=round(score, 2),
+        )
+
     def detect(
         self,
         ticker: str,
         reddit_mentions: list[dict[str, Any]] | None = None,
         discord_mentions: list[dict[str, Any]] | None = None,
+        stocktwits_mentions: list[dict[str, Any]] | None = None,
+        insider_signals: list[InsiderSignal] | None = None,
+        trends: TrendsSignal | None = None,
+        earnings: list[EarningsSignal] | None = None,
         sec_filing: SECFiling | None = None,
         news_sentiment: dict[str, Any] | None = None,
         technical: TechnicalScore | None = None,
     ) -> GemSignal:
         reddit_score = self.score_reddit(reddit_mentions or [])
         discord_score = self.score_discord(discord_mentions or [])
+        stocktwits_score = self.score_stocktwits(stocktwits_mentions or [])
+        insider_score = self.score_insider(insider_signals or [])
+        trends_score = self.score_trends(trends)
+        earnings_score = self.score_earnings(earnings or [])
         sec_score = self.score_sec(sec_filing)
         news_score = self.score_news(news_sentiment or {})
         if technical is None:
@@ -180,7 +288,10 @@ class GemDetector:
             )
         tech_score = self.score_technical(technical)
 
-        sources = [s for s in [reddit_score, discord_score, sec_score, news_score, tech_score] if s.raw_score > 0]
+        sources = [s for s in [
+            reddit_score, discord_score, stocktwits_score, insider_score,
+            trends_score, earnings_score, sec_score, news_score, tech_score,
+        ] if s.raw_score > 0]
         evidence = []
         for s in sources:
             evidence.extend(s.evidence)
@@ -189,6 +300,10 @@ class GemDetector:
             ticker_symbol=ticker,
             reddit_score=reddit_score.weighted_score,
             discord_score=discord_score.weighted_score,
+            stocktwits_score=stocktwits_score.weighted_score,
+            insider_score=insider_score.weighted_score,
+            trends_score=trends_score.weighted_score,
+            earnings_score=earnings_score.weighted_score,
             sec_score=sec_score.weighted_score,
             news_score=news_score.weighted_score,
             technical_score=tech_score.weighted_score,

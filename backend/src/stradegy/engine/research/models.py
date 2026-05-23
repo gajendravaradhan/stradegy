@@ -8,6 +8,10 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 class SignalSource(str, Enum):
     REDDIT = "reddit"
     DISCORD = "discord"
+    STOCKTWITS = "stocktwits"
+    INSIDER = "insider"
+    TRENDS = "trends"
+    EARNINGS = "earnings"
     SEC = "sec"
     NEWS = "news"
     TECHNICAL = "technical"
@@ -61,6 +65,72 @@ class DiscordMention(BaseModel):
     mention_count_24h: int = Field(..., ge=0)
     velocity_vs_avg: float
     author: str | None = None
+
+    @field_validator("ticker_symbol")
+    @classmethod
+    def uppercase_ticker(cls, v: str) -> str:
+        return v.upper()
+
+
+class StockTwitsMention(BaseModel):
+    ticker_symbol: str = Field(..., min_length=1, max_length=16)
+    message_id: str
+    message_url: str
+    content: str
+    created_utc: datetime
+    sentiment_compound: float = Field(..., ge=-1.0, le=1.0)
+    likes: int = Field(..., ge=0)
+    reshares: int = Field(..., ge=0)
+    watchlist_count: int = Field(..., ge=0)
+    author: str | None = None
+
+    @field_validator("ticker_symbol")
+    @classmethod
+    def uppercase_ticker(cls, v: str) -> str:
+        return v.upper()
+
+
+class InsiderSignal(BaseModel):
+    ticker_symbol: str = Field(..., min_length=1, max_length=16)
+    insider_name: str
+    insider_title: str
+    transaction_date: datetime
+    transaction_type: str
+    shares: int
+    price: float
+    total_value: float
+    filing_url: str
+    is_cluster: bool = False
+
+    @field_validator("ticker_symbol")
+    @classmethod
+    def uppercase_ticker(cls, v: str) -> str:
+        return v.upper()
+
+
+class TrendsSignal(BaseModel):
+    ticker_symbol: str = Field(..., min_length=1, max_length=16)
+    interest_score: float = Field(..., ge=0.0, le=100.0)
+    interest_vs_90d_avg: float
+    direction: str
+    region_breakdown: dict[str, float] | None = None
+
+    @field_validator("ticker_symbol")
+    @classmethod
+    def uppercase_ticker(cls, v: str) -> str:
+        return v.upper()
+
+
+class EarningsSignal(BaseModel):
+    ticker_symbol: str = Field(..., min_length=1, max_length=16)
+    report_date: datetime
+    eps_estimate: float | None = None
+    eps_actual: float | None = None
+    revenue_estimate: float | None = None
+    revenue_actual: float | None = None
+    surprise_pct: float | None = None
+    is_upcoming: bool = False
+    days_until: int = 0
 
     @field_validator("ticker_symbol")
     @classmethod
@@ -134,12 +204,16 @@ class GemSignal(BaseModel):
     ticker_symbol: str = Field(..., min_length=1, max_length=16)
     reddit_score: float = Field(0.0, ge=0.0, le=25.0)
     discord_score: float = Field(0.0, ge=0.0, le=25.0)
-    sec_score: float = Field(0.0, ge=0.0, le=30.0)
+    stocktwits_score: float = Field(0.0, ge=0.0, le=20.0)
+    insider_score: float = Field(0.0, ge=0.0, le=20.0)
+    trends_score: float = Field(0.0, ge=0.0, le=15.0)
+    earnings_score: float = Field(0.0, ge=0.0, le=15.0)
+    sec_score: float = Field(0.0, ge=0.0, le=25.0)
     news_score: float = Field(0.0, ge=0.0, le=20.0)
     technical_score: float = Field(0.0, ge=0.0, le=25.0)
-    total_score: float = Field(0.0, ge=0.0, le=100.0)
+    total_score: float = Field(0.0, ge=0.0, le=200.0)
     classification: GemClassification = GemClassification.DISCARD
-    source_count: int = Field(0, ge=0, le=5)
+    source_count: int = Field(0, ge=0, le=10)
     sources: list[SourceScore] = Field(default_factory=list)
     evidence_urls: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -152,14 +226,22 @@ class GemSignal(BaseModel):
     @model_validator(mode="after")
     def compute_scores(self) -> "GemSignal":
         self.total_score = round(
-            self.reddit_score + self.discord_score + self.sec_score + self.news_score + self.technical_score,
+            self.reddit_score
+            + self.discord_score
+            + self.stocktwits_score
+            + self.insider_score
+            + self.trends_score
+            + self.earnings_score
+            + self.sec_score
+            + self.news_score
+            + self.technical_score,
             2,
         )
-        if self.total_score >= 80:
+        if self.total_score >= 100:
             self.classification = GemClassification.STRONG
-        elif self.total_score >= 65:
+        elif self.total_score >= 80:
             self.classification = GemClassification.POTENTIAL
-        elif self.total_score >= 50:
+        elif self.total_score >= 60:
             self.classification = GemClassification.WATCHLIST
         else:
             self.classification = GemClassification.DISCARD

@@ -31,7 +31,7 @@ class SECAnalyzer:
                 "ticker": ticker.upper(),
                 "form_type": form_type,
                 "filing_date": filing.filing_date,
-                "url": filing.document_url,
+                "url": filing.filing_url,
             }
         except Exception as e:
             logger.error(f"Error fetching {form_type} for {ticker}: {e}")
@@ -59,7 +59,7 @@ class SECAnalyzer:
                 ticker_symbol=ticker,
                 filing_type="10-K",
                 filing_date=filing.filing_date,
-                filing_url=filing.document_url,
+                filing_url=filing.filing_url,
                 revenue_growth_yoy=revenue.get("growth") if revenue else None,
                 gross_margin=gross_margin,
                 operating_margin=operating_margin,

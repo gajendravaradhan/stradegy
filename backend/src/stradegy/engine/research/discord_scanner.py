@@ -171,6 +171,36 @@ class DiscordScanner:
     async def scan_hot(self, limit: int = 50) -> list[DiscordMention]:
         return await self.scan_recent(limit=limit)
 
+    async def scan_ticker(self, ticker: str, limit: int = 50) -> list[DiscordMention]:
+        if not self._ensure_client():
+            return []
+
+        all_mentions: list[DiscordMention] = []
+        search_terms = [ticker, f"${ticker}"]
+        per_channel_limit = max(1, limit // len(self.channel_ids)) if self.channel_ids else limit
+
+        for channel_id in self.channel_ids:
+            try:
+                messages = await self._fetch_channel_messages(channel_id, per_channel_limit)
+                if not messages:
+                    continue
+
+                channel_info = {"id": str(channel_id), "name": "unknown"}
+                for msg in messages:
+                    content = msg.get("content", "")
+                    if any(term in content.upper() for term in search_terms):
+                        msg_mentions = self._analyze_message(msg, channel_info)
+                        for m in msg_mentions:
+                            if m.ticker_symbol.upper() == ticker.upper():
+                                all_mentions.append(m)
+
+                await asyncio.sleep(1.1)
+            except Exception as e:
+                logger.warning(f"Discord ticker scan error for {ticker} in channel {channel_id}: {e}")
+
+        logger.info(f"Discord ticker scan for {ticker}: {len(all_mentions)} mentions found")
+        return all_mentions
+
     async def close(self):
         if self.client:
             await self.client.aclose()

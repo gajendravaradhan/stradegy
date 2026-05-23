@@ -36,8 +36,18 @@ class RedditScanner:
         self._running = False
         self.client = httpx.AsyncClient(
             headers={
-                "User-Agent": "StradegyBot/1.0 (Research Scanner; +https://github.com/stradegy)",
-                "Accept": "application/json",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept-Encoding": "gzip, deflate, br",
+                "DNT": "1",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+                "Cache-Control": "max-age=0",
             },
             timeout=httpx.Timeout(30.0),
             follow_redirects=True,
@@ -86,7 +96,7 @@ class RedditScanner:
             mentions.append(mention)
         return mentions
 
-    async def _fetch_subreddit(self, subreddit: str, sort: str, limit: int) -> list[dict[str, Any]]:
+    async def _fetch_subreddit(self, subreddit: str, sort: str, limit: int, retries: int = 0) -> list[dict[str, Any]]:
         url = f"{self.API_BASE}/r/{subreddit}/{sort}.json"
         params = {"limit": min(limit, 100)}
         if sort == "top":
@@ -101,9 +111,13 @@ class RedditScanner:
                 logger.info(f"Fetched {len(posts)} posts from r/{subreddit}/{sort}")
                 return posts
             elif resp.status_code == 429:
-                logger.warning(f"Reddit rate limited for r/{subreddit}. Waiting...")
-                await asyncio.sleep(5)
-                return await self._fetch_subreddit(subreddit, sort, limit)
+                if retries >= 3:
+                    logger.warning(f"Reddit rate limited for r/{subreddit} after {retries} retries. Skipping.")
+                    return []
+                wait = min(2 ** retries * 5, 30)
+                logger.warning(f"Reddit rate limited for r/{subreddit}. Waiting {wait}s...")
+                await asyncio.sleep(wait)
+                return await self._fetch_subreddit(subreddit, sort, limit, retries + 1)
             elif resp.status_code == 403:
                 logger.warning(f"Reddit blocked request for r/{subreddit} (403). User-Agent may be blocked.")
                 return []
@@ -124,7 +138,7 @@ class RedditScanner:
                 for post in posts:
                     mentions = self._parse_post(post)
                     all_mentions.extend(mentions)
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(2.0)
             except Exception as e:
                 logger.warning(f"Error scanning r/{subreddit}: {e}")
 
@@ -141,11 +155,35 @@ class RedditScanner:
                 for post in posts:
                     mentions = self._parse_post(post)
                     all_mentions.extend(mentions)
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(2.0)
             except Exception as e:
                 logger.warning(f"Error scanning r/{subreddit}: {e}")
 
         logger.info(f"Reddit hot scan complete: {len(all_mentions)} mentions found")
+        return all_mentions
+
+    async def scan_ticker(self, ticker: str, limit: int = 50) -> list[RedditMention]:
+        all_mentions: list[RedditMention] = []
+        per_sub = max(1, limit // len(self.SUBREDDITS))
+        search_terms = [ticker, f"${ticker}"]
+
+        for subreddit in self.SUBREDDITS:
+            try:
+                posts = await self._fetch_subreddit(subreddit, "hot", per_sub)
+                for post in posts:
+                    title = post.get("title", "")
+                    selftext = post.get("selftext", "")
+                    text = f"{title} {selftext}"
+                    if any(term in text.upper() for term in search_terms):
+                        mentions = self._parse_post(post)
+                        for m in mentions:
+                            if m.ticker_symbol.upper() == ticker.upper():
+                                all_mentions.append(m)
+                await asyncio.sleep(2.0)
+            except Exception as e:
+                logger.warning(f"Error scanning r/{subreddit} for {ticker}: {e}")
+
+        logger.info(f"Reddit ticker scan for {ticker}: {len(all_mentions)} mentions found")
         return all_mentions
 
     async def close(self):
