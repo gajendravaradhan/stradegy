@@ -20,6 +20,19 @@ from stradegy.engine.research.reddit_scanner import RedditScanner
 from stradegy.engine.research.sec_analyzer import SECAnalyzer
 from stradegy.engine.research.stocktwits_scanner import StockTwitsScanner
 from stradegy.engine.research.trends_scanner import GoogleTrendsScanner
+from stradegy.engine.research.alpaca_news_scanner import AlpacaNewsScanner
+from stradegy.engine.research.hackernews_scanner import HackerNewsScanner
+from stradegy.engine.research.telegram_scanner import TelegramScanner
+from stradegy.engine.research.bluesky_scanner import BlueskyScanner
+from stradegy.engine.research.youtube_scanner import YouTubeScanner
+from stradegy.engine.research.fred_scanner import FredScanner
+from stradegy.engine.research.fear_greed_scanner import FearGreedScanner
+from stradegy.engine.research.options_scanner import OptionsScanner
+from stradegy.engine.research.twelve_data_scanner import TwelveDataScanner
+from stradegy.engine.research.fmp_analyst_scanner import FMPAnalystScanner
+from stradegy.engine.research.finra_scanner import FINRAScanner
+from stradegy.engine.research.keyvex_scanner import KeyVexScanner
+from stradegy.engine.research.adanos_scanner import AdanosScanner
 from stradegy.engine.alerts.whatsapp_alerts import WhatsAppAlertManager
 from stradegy.engine.research.discord_alerts import DiscordAlertManager
 from stradegy.engine.research.telegram_alerts import TelegramAlertManager
@@ -41,6 +54,19 @@ class ResearchOrchestrator:
         self.earnings = EarningsScanner()
         self.sec = SECAnalyzer()
         self.news = NewsScanner()
+        self.alpaca_news = AlpacaNewsScanner()
+        self.hackernews = HackerNewsScanner()
+        self.telegram_scanner = TelegramScanner()
+        self.bluesky = BlueskyScanner()
+        self.youtube = YouTubeScanner()
+        self.fred = FredScanner()
+        self.fear_greed = FearGreedScanner()
+        self.options = OptionsScanner()
+        self.twelve_data = TwelveDataScanner()
+        self.fmp = FMPAnalystScanner()
+        self.finra = FINRAScanner()
+        self.keyvex = KeyVexScanner()
+        self.adanos = AdanosScanner()
         self.gem_detector = GemDetector()
         self.validator = Validator()
         self.telegram = TelegramAlertManager()
@@ -49,39 +75,44 @@ class ResearchOrchestrator:
 
     async def run_market_open_scan(self):
         logger.info("Running market open research scan (discovery mode)")
-        candidates, reddit_data, discord_data, stocktwits_data, insider_data, earnings_data = await self._discover_candidates()
-        await self._run_full_pipeline(candidates, reddit_data, discord_data, stocktwits_data, insider_data, earnings_data)
+        candidates, reddit_data, discord_data, stocktwits_data, insider_data, earnings_data, alpaca_news_data, hackernews_data, telegram_data, bluesky_data, youtube_data = await self._discover_candidates()
+        await self._run_full_pipeline(candidates, reddit_data, discord_data, stocktwits_data, insider_data, earnings_data, alpaca_news_data, hackernews_data, telegram_data, bluesky_data, youtube_data)
 
     async def run_close_scan(self):
         logger.info("Running market close SEC + News scan (discovery mode)")
-        candidates, reddit_data, discord_data, stocktwits_data, insider_data, earnings_data = await self._discover_candidates()
-        await self._run_full_pipeline(candidates, reddit_data, discord_data, stocktwits_data, insider_data, earnings_data)
+        candidates, reddit_data, discord_data, stocktwits_data, insider_data, earnings_data, alpaca_news_data, hackernews_data, telegram_data, bluesky_data, youtube_data = await self._discover_candidates()
+        await self._run_full_pipeline(candidates, reddit_data, discord_data, stocktwits_data, insider_data, earnings_data, alpaca_news_data, hackernews_data, telegram_data, bluesky_data, youtube_data)
 
     async def run_incremental_scan(self):
         logger.info("Running incremental scan (discovery mode)")
-        candidates, reddit_data, discord_data, stocktwits_data, insider_data, earnings_data = await self._discover_candidates(incremental=True)
+        candidates, reddit_data, discord_data, stocktwits_data, insider_data, earnings_data, alpaca_news_data, hackernews_data, telegram_data, bluesky_data, youtube_data = await self._discover_candidates(incremental=True)
         if candidates:
-            await self._run_full_pipeline(candidates, reddit_data, discord_data, stocktwits_data, insider_data, earnings_data)
+            await self._run_full_pipeline(candidates, reddit_data, discord_data, stocktwits_data, insider_data, earnings_data, alpaca_news_data, hackernews_data, telegram_data, bluesky_data, youtube_data)
         else:
             logger.info("Incremental scan: no candidates discovered")
 
     async def run_weekend_deep(self):
         logger.info("Running weekend deep analysis (discovery mode)")
-        candidates, reddit_data, discord_data, stocktwits_data, insider_data, earnings_data = await self._discover_candidates(deep_mode=True)
-        await self._run_full_pipeline(candidates, reddit_data, discord_data, stocktwits_data, insider_data, earnings_data, deep_mode=True)
+        candidates, reddit_data, discord_data, stocktwits_data, insider_data, earnings_data, alpaca_news_data, hackernews_data, telegram_data, bluesky_data, youtube_data = await self._discover_candidates(deep_mode=True)
+        await self._run_full_pipeline(candidates, reddit_data, discord_data, stocktwits_data, insider_data, earnings_data, alpaca_news_data, hackernews_data, telegram_data, bluesky_data, youtube_data, deep_mode=True)
 
     async def _discover_candidates(
         self, incremental: bool = False, deep_mode: bool = False
-    ) -> tuple[list[str], dict[str, list], dict[str, list], dict[str, list], dict[str, list], dict[str, list]]:
+    ):
         logger.info("Discovering candidates from all sources...")
 
-        reddit_mentions, discord_mentions, stocktwits_mentions, insider_signals, earnings_signals, base_tickers = await asyncio.gather(
+        reddit_mentions, discord_mentions, stocktwits_mentions, insider_signals, earnings_signals, base_tickers, alpaca_news_mentions, hackernews_mentions, telegram_mentions, bluesky_mentions, youtube_mentions = await asyncio.gather(
             self._safe_scan(self.reddit.scan_hot, limit=100),
             self._safe_scan(self.discord.scan_hot, limit=100),
             self._safe_scan(self.stocktwits.scan_hot, limit=50),
             self._safe_scan(self.insider.scan_recent, days=7),
             self._safe_scan(self.earnings.scan_upcoming),
             self._get_active_tickers(),
+            self._safe_scan(self.alpaca_news.scan_hot, limit=50),
+            self._safe_scan(self.hackernews.scan_hot, limit=50),
+            self._safe_scan(self.telegram_scanner.scan_hot, limit=50),
+            self._safe_scan(self.bluesky.scan_hot, limit=50),
+            self._safe_scan(self.youtube.scan_hot, limit=30),
             return_exceptions=True,
         )
 
@@ -104,17 +135,43 @@ class ResearchOrchestrator:
             logger.error(f"Base ticker fetch failed: {base_tickers}")
             base_tickers = []
 
+        if isinstance(alpaca_news_mentions, Exception):
+            logger.error(f"Alpaca News discovery failed: {alpaca_news_mentions}")
+            alpaca_news_mentions = []
+        if isinstance(hackernews_mentions, Exception):
+            logger.error(f"HackerNews discovery failed: {hackernews_mentions}")
+            hackernews_mentions = []
+        if isinstance(telegram_mentions, Exception):
+            logger.error(f"Telegram discovery failed: {telegram_mentions}")
+            telegram_mentions = []
+        if isinstance(bluesky_mentions, Exception):
+            logger.error(f"Bluesky discovery failed: {bluesky_mentions}")
+            bluesky_mentions = []
+        if isinstance(youtube_mentions, Exception):
+            logger.error(f"YouTube discovery failed: {youtube_mentions}")
+            youtube_mentions = []
+
         reddit_data = self._mentions_to_dict(reddit_mentions)
         discord_data = self._mentions_to_dict(discord_mentions)
         stocktwits_data = self._mentions_to_dict(stocktwits_mentions)
         insider_data = self._group_insider_by_ticker(insider_signals)
         earnings_data = self._group_earnings_by_ticker(earnings_signals)
+        alpaca_news_data = self._mentions_to_dict(alpaca_news_mentions)
+        hackernews_data = self._mentions_to_dict(hackernews_mentions)
+        telegram_data = self._mentions_to_dict(telegram_mentions)
+        bluesky_data = self._mentions_to_dict(bluesky_mentions)
+        youtube_data = self._mentions_to_dict(youtube_mentions)
 
         reddit_tickers = set(reddit_data.keys())
         discord_tickers = set(discord_data.keys())
         stocktwits_tickers = set(stocktwits_data.keys())
         insider_tickers = set(insider_data.keys())
         earnings_tickers = set(earnings_data.keys())
+        alpaca_news_tickers = set(alpaca_news_data.keys())
+        hackernews_tickers = set(hackernews_data.keys())
+        telegram_tickers = set(telegram_data.keys())
+        bluesky_tickers = set(bluesky_data.keys())
+        youtube_tickers = set(youtube_data.keys())
         news_tickers = await self._discover_from_news()
         sec_tickers = await self._discover_from_sec() if deep_mode else set()
 
@@ -125,6 +182,11 @@ class ResearchOrchestrator:
             | stocktwits_tickers
             | insider_tickers
             | earnings_tickers
+            | alpaca_news_tickers
+            | hackernews_tickers
+            | telegram_tickers
+            | bluesky_tickers
+            | youtube_tickers
             | news_tickers
             | sec_tickers
         )
@@ -137,11 +199,14 @@ class ResearchOrchestrator:
             f"Discovery: {len(base_tickers)} base + {len(reddit_tickers)} Reddit + "
             f"{len(discord_tickers)} Discord + {len(stocktwits_tickers)} StockTwits + "
             f"{len(insider_tickers)} Insider + {len(earnings_tickers)} Earnings + "
+            f"{len(alpaca_news_tickers)} AlpacaNews + {len(hackernews_tickers)} HN + "
+            f"{len(telegram_tickers)} Telegram + {len(bluesky_tickers)} Bluesky + "
+            f"{len(youtube_tickers)} YouTube + "
             f"{len(news_tickers)} News + {len(sec_tickers)} SEC = "
             f"{len(all_candidates)} candidates ({len(new_tickers)} new)"
         )
 
-        return sorted(all_candidates), reddit_data, discord_data, stocktwits_data, insider_data, earnings_data
+        return sorted(all_candidates), reddit_data, discord_data, stocktwits_data, insider_data, earnings_data, alpaca_news_data, hackernews_data, telegram_data, bluesky_data, youtube_data
 
     async def _persist_discovered_tickers(self, new_tickers: list[str]):
         from stradegy.db import Ticker
@@ -262,6 +327,11 @@ class ResearchOrchestrator:
         stocktwits_data: dict[str, list] = None,
         insider_data: dict[str, list] = None,
         earnings_data: dict[str, list] = None,
+        alpaca_news_data: dict[str, list] = None,
+        hackernews_data: dict[str, list] = None,
+        telegram_data: dict[str, list] = None,
+        bluesky_data: dict[str, list] = None,
+        youtube_data: dict[str, list] = None,
         deep_mode: bool = False,
     ):
         from stradegy.engine.data.store import DataStore
@@ -273,6 +343,11 @@ class ResearchOrchestrator:
         stocktwits_data = stocktwits_data or {}
         insider_data = insider_data or {}
         earnings_data = earnings_data or {}
+        alpaca_news_data = alpaca_news_data or {}
+        hackernews_data = hackernews_data or {}
+        telegram_data = telegram_data or {}
+        bluesky_data = bluesky_data or {}
+        youtube_data = youtube_data or {}
 
         async with async_session() as session:
             store = DataStore(session)
@@ -285,6 +360,11 @@ class ResearchOrchestrator:
                     ticker_stocktwits = stocktwits_data.get(ticker, [])
                     ticker_insider = insider_data.get(ticker, [])
                     ticker_earnings = earnings_data.get(ticker, [])
+                    ticker_alpaca_news = alpaca_news_data.get(ticker, [])
+                    ticker_hackernews = hackernews_data.get(ticker, [])
+                    ticker_telegram = telegram_data.get(ticker, [])
+                    ticker_bluesky = bluesky_data.get(ticker, [])
+                    ticker_youtube = youtube_data.get(ticker, [])
 
                     technical = None
                     try:
@@ -314,6 +394,54 @@ class ResearchOrchestrator:
                         except Exception as e:
                             logger.warning(f"News scan failed for {ticker}: {e}")
 
+                    fred_indicators = None
+                    try:
+                        fred_indicators = await self.fred.scan_ticker(ticker)
+                    except Exception as e:
+                        logger.warning(f"FRED scan failed for {ticker}: {e}")
+
+                    fear_greed_signals = None
+                    try:
+                        fear_greed_signals = await self.fear_greed.scan_ticker(ticker)
+                    except Exception as e:
+                        logger.warning(f"FearGreed scan failed for {ticker}: {e}")
+
+                    options_signals = None
+                    try:
+                        options_signals = await self.options.scan_ticker(ticker)
+                    except Exception as e:
+                        logger.warning(f"Options scan failed for {ticker}: {e}")
+
+                    twelve_data_quotes = None
+                    try:
+                        twelve_data_quotes = await self.twelve_data.scan_ticker(ticker)
+                    except Exception as e:
+                        logger.warning(f"TwelveData scan failed for {ticker}: {e}")
+
+                    fmp_grades = None
+                    try:
+                        fmp_grades = await self.fmp.scan_ticker(ticker)
+                    except Exception as e:
+                        logger.warning(f"FMP scan failed for {ticker}: {e}")
+
+                    finra_si = None
+                    try:
+                        finra_si = await self.finra.scan_ticker(ticker)
+                    except Exception as e:
+                        logger.warning(f"FINRA scan failed for {ticker}: {e}")
+
+                    keyvex_signals = None
+                    try:
+                        keyvex_signals = await self.keyvex.scan_ticker(ticker)
+                    except Exception as e:
+                        logger.warning(f"KeyVex scan failed for {ticker}: {e}")
+
+                    adanos_sentiments = None
+                    try:
+                        adanos_sentiments = await self.adanos.scan_ticker(ticker)
+                    except Exception as e:
+                        logger.warning(f"Adanos scan failed for {ticker}: {e}")
+
                     gem = self.gem_detector.detect(
                         ticker=ticker,
                         reddit_mentions=ticker_reddit,
@@ -325,6 +453,19 @@ class ResearchOrchestrator:
                         sec_filing=sec_filing,
                         news_sentiment=news_sentiment,
                         technical=technical,
+                        alpaca_news_mentions=ticker_alpaca_news,
+                        hackernews_mentions=ticker_hackernews,
+                        telegram_mentions=ticker_telegram,
+                        bluesky_mentions=ticker_bluesky,
+                        youtube_mentions=ticker_youtube,
+                        fred_indicators=fred_indicators,
+                        fear_greed_signals=fear_greed_signals,
+                        options_signals=options_signals,
+                        twelve_data_quotes=twelve_data_quotes,
+                        fmp_grades=fmp_grades,
+                        finra_si=finra_si,
+                        keyvex_signals=keyvex_signals,
+                        adanos_sentiments=adanos_sentiments,
                     )
 
                     from stradegy.engine.research.db import GemSignalRecord, ResearchStore
@@ -333,9 +474,26 @@ class ResearchOrchestrator:
                         ticker_symbol=gem.ticker_symbol,
                         reddit_score=gem.reddit_score,
                         discord_score=gem.discord_score,
+                        stocktwits_score=gem.stocktwits_score,
+                        insider_score=gem.insider_score,
+                        trends_score=gem.trends_score,
+                        earnings_score=gem.earnings_score,
                         sec_score=gem.sec_score,
                         news_score=gem.news_score,
                         technical_score=gem.technical_score,
+                        alpaca_news_score=gem.alpaca_news_score,
+                        hackernews_score=gem.hackernews_score,
+                        telegram_score=gem.telegram_score,
+                        bluesky_score=gem.bluesky_score,
+                        youtube_score=gem.youtube_score,
+                        fred_score=gem.fred_score,
+                        fear_greed_score=gem.fear_greed_score,
+                        options_score=gem.options_score,
+                        twelve_data_score=gem.twelve_data_score,
+                        fmp_score=gem.fmp_score,
+                        finra_score=gem.finra_score,
+                        keyvex_score=gem.keyvex_score,
+                        adanos_score=gem.adanos_score,
                         total_score=gem.total_score,
                         classification=gem.classification.value,
                         source_count=gem.source_count,
@@ -381,25 +539,55 @@ class ResearchOrchestrator:
                 ts = m.ticker_symbol.upper()
                 if ts not in grouped:
                     grouped[ts] = []
-                entry = {"sentiment_compound": m.sentiment_compound}
+                entry = {}
+                if hasattr(m, "sentiment_compound"):
+                    entry["sentiment_compound"] = m.sentiment_compound
+                else:
+                    entry["sentiment_compound"] = 0.0
                 if hasattr(m, "upvote_ratio"):
                     entry["upvote_ratio"] = m.upvote_ratio
                 if hasattr(m, "velocity_vs_avg"):
                     entry["velocity_vs_avg"] = m.velocity_vs_avg
                 if hasattr(m, "post_url"):
                     entry["post_url"] = m.post_url
-                if hasattr(m, "num_reactions"):
-                    entry["num_reactions"] = m.num_reactions
-                if hasattr(m, "reply_count"):
-                    entry["reply_count"] = m.reply_count
+                if hasattr(m, "article_url"):
+                    entry["article_url"] = m.article_url
+                if hasattr(m, "story_url"):
+                    entry["story_url"] = m.story_url
+                if hasattr(m, "video_url"):
+                    entry["video_url"] = m.video_url
                 if hasattr(m, "message_url"):
                     entry["message_url"] = m.message_url
+                if hasattr(m, "num_reactions"):
+                    entry["num_reactions"] = m.num_reactions
+                if hasattr(m, "reactions"):
+                    entry["reactions"] = m.reactions
+                if hasattr(m, "reply_count"):
+                    entry["reply_count"] = m.reply_count
+                if hasattr(m, "replies"):
+                    entry["replies"] = m.replies
                 if hasattr(m, "likes"):
                     entry["likes"] = m.likes
                 if hasattr(m, "reshares"):
                     entry["reshares"] = m.reshares
+                if hasattr(m, "reposts"):
+                    entry["reposts"] = m.reposts
                 if hasattr(m, "watchlist_count"):
                     entry["watchlist_count"] = m.watchlist_count
+                if hasattr(m, "points"):
+                    entry["points"] = m.points
+                if hasattr(m, "num_comments"):
+                    entry["num_comments"] = m.num_comments
+                if hasattr(m, "views"):
+                    entry["views"] = m.views
+                if hasattr(m, "channel_name"):
+                    entry["channel_name"] = m.channel_name
+                if hasattr(m, "message_id"):
+                    entry["message_id"] = m.message_id
+                if hasattr(m, "sentiment_label"):
+                    entry["sentiment_label"] = m.sentiment_label
+                if hasattr(m, "comment_text"):
+                    entry["comment_text"] = m.comment_text
                 grouped[ts].append(entry)
             except Exception:
                 pass
@@ -502,9 +690,26 @@ class ResearchOrchestrator:
                     ticker_symbol=gem.ticker_symbol,
                     reddit_score=gem.reddit_score,
                     discord_score=gem.discord_score,
+                    stocktwits_score=gem.stocktwits_score,
+                    insider_score=gem.insider_score,
+                    trends_score=gem.trends_score,
+                    earnings_score=gem.earnings_score,
                     sec_score=gem.sec_score,
                     news_score=gem.news_score,
                     technical_score=gem.technical_score,
+                    alpaca_news_score=gem.alpaca_news_score,
+                    hackernews_score=gem.hackernews_score,
+                    telegram_score=gem.telegram_score,
+                    bluesky_score=gem.bluesky_score,
+                    youtube_score=gem.youtube_score,
+                    fred_score=gem.fred_score,
+                    fear_greed_score=gem.fear_greed_score,
+                    options_score=gem.options_score,
+                    twelve_data_score=gem.twelve_data_score,
+                    fmp_score=gem.fmp_score,
+                    finra_score=gem.finra_score,
+                    keyvex_score=gem.keyvex_score,
+                    adanos_score=gem.adanos_score,
                     total_score=gem.total_score,
                     classification=gem.classification.value,
                     source_count=gem.source_count,

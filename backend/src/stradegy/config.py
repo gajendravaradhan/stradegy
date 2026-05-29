@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # Telegram
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
+    telegram_api_id: str = ""
+    telegram_api_hash: str = ""
+    telegram_channels: str = ""
 
     # Finnhub
     finnhub_api_key: str = ""
@@ -37,6 +40,28 @@ class Settings(BaseSettings):
     reddit_client_id: str = ""
     reddit_client_secret: str = ""
     reddit_user_agent: str = "stradegy/1.0"
+
+    # Bluesky
+    bluesky_handle: str = ""
+    bluesky_app_password: str = ""
+
+    # YouTube
+    youtube_api_key: str = ""
+
+    # FRED
+    fred_api_key: str = ""
+
+    # Twelve Data
+    twelve_data_api_key: str = ""
+
+    # FMP
+    fmp_api_key: str = ""
+
+    # KeyVex
+    keyvex_api_key: str = ""
+
+    # Adanos
+    adanos_api_key: str = ""
 
     discord_bot_token: str = ""
     discord_channel_ids: str = ""

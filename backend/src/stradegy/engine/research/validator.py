@@ -55,7 +55,7 @@ class Validator:
         cross_ref = gem.source_count >= 1
         checks["cross_reference"] = cross_ref
         if not cross_ref:
-            failures.append("Less than 2 independent signal sources")
+            failures.append("Less than 1 independent signal source")
 
         evidence_ok = len(gem.evidence_urls) > 0
         checks["evidence"] = evidence_ok
