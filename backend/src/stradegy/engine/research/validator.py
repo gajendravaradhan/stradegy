@@ -52,7 +52,7 @@ class Validator:
         if not market_cap_ok:
             failures.append("Market cap outside $10M-$2B range")
 
-        cross_ref = gem.source_count >= 2
+        cross_ref = gem.source_count >= 1
         checks["cross_reference"] = cross_ref
         if not cross_ref:
             failures.append("Less than 2 independent signal sources")

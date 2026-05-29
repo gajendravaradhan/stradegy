@@ -237,11 +237,11 @@ class GemSignal(BaseModel):
             + self.technical_score,
             2,
         )
-        if self.total_score >= 100:
+        if self.total_score >= 50:
             self.classification = GemClassification.STRONG
-        elif self.total_score >= 80:
+        elif self.total_score >= 35:
             self.classification = GemClassification.POTENTIAL
-        elif self.total_score >= 60:
+        elif self.total_score >= 25:
             self.classification = GemClassification.WATCHLIST
         else:
             self.classification = GemClassification.DISCARD
