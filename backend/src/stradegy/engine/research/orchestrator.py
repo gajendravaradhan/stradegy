@@ -327,11 +327,30 @@ class ResearchOrchestrator:
                         technical=technical,
                     )
 
+                    from stradegy.engine.research.db import GemSignalRecord, ResearchStore
+                    research_store = ResearchStore(session)
+                    record = GemSignalRecord(
+                        ticker_symbol=gem.ticker_symbol,
+                        reddit_score=gem.reddit_score,
+                        discord_score=gem.discord_score,
+                        sec_score=gem.sec_score,
+                        news_score=gem.news_score,
+                        technical_score=gem.technical_score,
+                        total_score=gem.total_score,
+                        classification=gem.classification.value,
+                        source_count=gem.source_count,
+                        evidence_urls=gem.evidence_urls,
+                        alerted=False,
+                        status="pending",
+                    )
+                    await research_store.save_gem_signal(record)
+
                     if gem.classification in (GemClassification.STRONG, GemClassification.POTENTIAL):
                         self.validator.store = store
                         validation = await self.validator.validate(gem)
                         if validation.is_valid:
                             gems_found.append(gem)
+                            await research_store.mark_gem_alerted(record.id)
                             await asyncio.gather(
                                 self.telegram.send_gem_alert(gem),
                                 self.discord_alerts.send_gem_alert(gem),
@@ -345,7 +364,7 @@ class ResearchOrchestrator:
                         else:
                             logger.info(f"Gem rejected for {ticker}: {validation.failures}")
                     else:
-                        logger.debug(f"No gem for {ticker}: {gem.total_score}")
+                        logger.info(f"Low-confidence gem stored for {ticker}: score={gem.total_score}, class={gem.classification.value}, sources={gem.source_count}")
 
                 except Exception as e:
                     logger.error(f"Pipeline error for {ticker}: {e}")
