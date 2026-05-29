@@ -1,65 +1,56 @@
-# Stradegy v3.0.0 Release Notes
+# Stradegy v3.1.0 Release Notes
 
-**Release Date:** May 23, 2026
-**Codename:** Daily Swipe
+**Release Date:** May 27, 2026
+**Codename:** Gem Unlock
 **Live URL:** https://stradegy.duckdns.org
 
 ---
 
-## Major Highlights
+## Critical Fixes
 
-### Left/Right Swipe Navigation (PWA)
-The mobile PWA now supports natural left/right swipe gestures to navigate between tabs. Swipe left to go to the next tab, swipe right to go back — just like native iOS/Android apps. Smart gesture detection avoids conflicts with vertically scrolling lists, sparkline charts, and horizontally scrollable containers.
+### Gem Detection Thresholds Lowered
+The original thresholds were impossibly high given that most scanners return empty results in production. After logging 209-ticker scans showing 0 gems found, we analyzed the scoring distribution and adjusted:
 
-### Daily Self-Improvement Cycle
-The self-improvement algorithm now runs **every day at 02:00 UTC** (overnight) instead of once per week. This enables the system to react faster to changing market conditions, adjust strategy weights more responsively, and continuously optimize based on the most recent trade traces.
+| Classification | Old | New |
+|---------------|-----|-----|
+| STRONG | >= 100 | >= 50 |
+| POTENTIAL | >= 80 | >= 35 |
+| WATCHLIST | >= 60 | >= 25 |
 
-### New Backend Modules
-- **Alert System** (`engine/alerts/`): WhatsApp and multi-channel alert management
-- **Monitoring Suite** (`engine/monitoring/`): Price monitor, risk monitor, correlation monitor, and data quality auditor
-- **Overnight Backtesting** (`engine/backtest/overnight_backtest.py`): Nightly backtest runner for continuous strategy validation
-- **Pre-Market Scanner** (`engine/research/premarket_scan.py`): Early morning research scan before market open
-- **Social Stream & Trend Scanners**: Additional signal sources for the research pipeline
+Real-world gems scoring 25-41 (previously DISCARD) will now correctly classify as WATCHLIST or POTENTIAL.
 
-### Enhanced Research Pipeline
-- Expanded Discord scanner with richer mention tracking
-- Improved gem detector with better scoring and classification
-- New SEC analyzer enhancements for insider transaction detection
-- Reddit scanner optimizations for sentiment extraction
+### All Gems Persisted to Database
+Previously, gems classified as WATCHLIST or DISCARD were silently discarded with a `logger.debug` call. The UI always showed zero gems because the database was never populated. Now **every gem** is saved to `gem_signals` regardless of classification, making them visible in the Alerts tab.
 
-### Frontend Enhancements
-- **Watchlist Page**: Dedicated page for tracking watched tickers
-- **Interactive Sparklines**: Touch-friendly price charts with hover tooltips on ticker detail
-- **Portfolio Improvements**: Better metrics display and trade history
-- **Alerts Page**: Richer gem cards with signal breakdown
-- **Settings Updates**: Additional configuration options
+### Validator Source Requirement Relaxed
+The validator required 2+ independent signal sources. With most scanners returning empty due to rate limiting or missing API credentials, this blocked any gem from being approved. Reduced to 1 source so a single strong signal (e.g., Reddit mention + technical confirmation) is actionable.
 
-### Deployment & Infrastructure
-- NAS deployment support with Caddy reverse proxy
-- Docker Compose configurations for multiple deployment targets
-- Health monitoring and log rotation scripts
-- DuckDNS auto-update integration
+### Reddit Scanner User-Agent Fixed
+The browser-mimicking User-Agent was triggering Reddit 403 blocks. Updated to `Stradegy/3.0.0 (financial research bot)` — a clean, identifiable bot UA that Reddit's public JSON endpoints accept.
 
 ---
 
-## Breaking Changes
+## Files Changed
 
-None. All changes are additive or configuration-level.
-
----
-
-## Migration Guide
-
-No migration needed. Update to v3.0.0 is a simple `git pull` and restart.
-
----
-
-## What's Next
-
-- Live trading graduation checklist at `plans/LIVE_TRADING_CHECKLIST.md`
-- PWA home screen installation on mobile devices
-- First daily self-improvement cycle run (tonight at 02:00 UTC)
+| File | Change |
+|------|--------|
+| `models.py` | Gem thresholds: STRONG 100->50, POTENTIAL 80->35, WATCHLIST 60->25 |
+| `validator.py` | Source count requirement: 2->1 |
+| `orchestrator.py` | All gems persisted to DB via GemSignalRecord; info-level logging |
+| `reddit_scanner.py` | User-Agent updated to bot identity |
 
 ---
 
-*Stradegy v3.0.0 — Swipe, trade, improve. Daily.*
+## Upgrade Instructions
+
+```bash
+git pull
+cd backend && source .venv/bin/activate && pip install -e .
+sudo systemctl restart stradegy   # or ./start.sh
+```
+
+After restart, check `/api/alerts` within 15 minutes of the next market open -- gems should appear.
+
+---
+
+*Stradegy v3.1.0 -- Lower the bar, raise the signal.*
